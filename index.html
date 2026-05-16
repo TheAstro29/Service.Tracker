@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Service Tracker by C2TECH</title>
+
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="style.css" />
+
+</head>
+
+<body>
+
+    <div class="sticky-wrapper">
+        <div class="header-top">
+            <div class="brand">
+                <h1>Service Tracker <span>BY C2TECH v0.5.1 </span></h1>
+            </div>
+            <div style="display: flex; align-items: center;">
+                <!-- เพิ่มไอคอนแม่กุญแจ -->
+                <i class="fas fa-lock admin-login-btn" id="lockIcon" onclick="adminAuth()"></i>
+
+                <button class="btn-refresh" onclick="loadData()">
+                    <i class="fas fa-sync-alt" id="refreshIcon"></i> รีเฟรช
+                </button>
+            </div>
+        </div>
+
+        <div class="filter-group">
+            <div id="f-overdue" class="f-card" onclick="smartToggle('overdue')">
+                <span id="cnt-overdue" class="val" style="color: #e11d48;">0</span>
+                <span class="lab">เลยกำหนด</span>
+            </div>
+            <div id="f-urgent" class="f-card" onclick="smartToggle('urgent')">
+                <span id="cnt-urgent" class="val" style="color: #fb8500;">0</span>
+                <span class="lab">ใกล้กำหนด</span>
+            </div>
+            <div id="f-all" class="f-card active-all" onclick="smartToggle('all')">
+                <span id="cnt-all" class="val" style="color: #22c55e;">0</span>
+                <span class="lab">ทั้งหมด</span>
+            </div>
+        </div>
+
+
+        <div class="search-container">
+            <div class="search-box">
+                <i class="fas fa-search" style="color:var(--primary)"></i>
+                <input type="text" id="mainSearch" placeholder="ค้นหาชื่อ, S/N, หรือจังหวัด..." onkeyup="runFilters()">
+            </div>
+        </div>
+
+        <div class="search-container" style="margin-top: 10px; display: flex; justify-content: center;">
+            <div
+                style="display: flex; gap: 8px; align-items: center; width: auto; max-width: 100%; flex-wrap: wrap; justify-content: center;">
+
+                <!-- 1. ปุ่มล้างกรอง (ขนาดกระทัดรัด) -->
+                <button class="btn-clear" onclick="clearAllFilters()"
+                    style="background: #64748b; border-radius: 20px; padding: 0 12px; font-size: 11px; height: 32px; border: none; cursor: pointer; color: white; white-space: nowrap;">
+                    <i class="fas fa-eraser"></i> ล้างการกรอง
+                </button>
+
+                <!-- 2. ปุ่ม RENEW (ขนาดกระทัดรัด) -->
+                <div
+                    style="display: flex; align-items: center; gap: 8px; background: #ffffff; padding: 0 10px; border-radius: 20px; border: 1.5px solid var(--accent); height: 32px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                    <span style="font-size: 10px; font-weight: 800; color: var(--primary);">RENEW</span>
+                    <label class="compact-switch" style="transform: scale(0.85);">
+                        <input type="checkbox" id="showRenewOnlySwitch" onchange="runFilters()">
+                        <span class="compact-slider"></span>
+                    </label>
+                </div>
+
+                <!-- 3. ปุ่ม DONE (ขนาดกระทัดรัด) -->
+                <div
+                    style="display: flex; align-items: center; gap: 8px; background: #ffffff; padding: 0 10px; border-radius: 20px; border: 1.5px solid #e2e8f0; height: 32px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                    <span style="font-size: 10px; font-weight: 800; color: var(--primary);">DONE</span>
+                    <label class="compact-switch" style="transform: scale(0.85);">
+                        <input type="checkbox" id="hideCompleteSwitch" onchange="render()">
+                        <span class="compact-slider"></span>
+                    </label>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <div id="loading" class="loader-main" style="display: block;">
+        <div class="loader-container">
+            <div class="custom-tech-loader">
+                <div class="loader-ring ring-outer"></div>
+                <div class="loader-ring ring-inner"></div>
+                <div class="loader-center-icon">
+                    <i class="fas fa-sync-alt fa-spin-custom"></i>
+                </div>
+            </div>
+            <div class="loader-text">กำลังเชื่อมต่อข้อมูลล่าสุด...</div>
+            <div class="loader-subtext">SERVICE TRACKER BY C2TECH</div>
+            <div class="loader-bar-wrapper">
+                <div class="loader-progress-bar"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <main id="serviceList"></main>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+
+</html>

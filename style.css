@@ -1,0 +1,734 @@
+/* เพิ่มสไตล์ปุ่ม Login แม่กุญแจ */
+.admin-login-btn {
+    color: var(--accent);
+    font-size: 20px;
+    margin-right: 15px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.admin-login-btn.active {
+    color: #fff;
+    text-shadow: 0 0 10px var(--accent);
+}
+
+.s-card[data-renew="true"] {
+    border: 2px solid var(--accent) !important;
+    background: linear-gradient(180deg, #fffcf5 0%, #ffffff 100%);
+}
+
+.status-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: var(--accent);
+    color: var(--primary);
+    font-size: 10px;
+    font-weight: 800;
+    padding: 4px 10px;
+    border-radius: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    z-index: 10;
+}
+
+/* --- Custom Compact Switch สำหรับปุ่ม Complete --- */
+.compact-switch {
+    position: relative;
+    display: inline-block;
+    width: 36px;
+    height: 18px;
+}
+
+.compact-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.compact-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #cbd5e1;
+    transition: .3s;
+    border-radius: 20px;
+}
+
+.compact-slider:before {
+    position: absolute;
+    content: "";
+    height: 12px;
+    width: 12px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .3s;
+    border-radius: 50%;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+input:checked+.compact-slider {
+    background-color: var(--secondary);
+}
+
+input:checked+.compact-slider:before {
+    transform: translateX(18px);
+}
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 34px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked+.slider {
+    background-color: var(--secondary);
+}
+
+input:checked+.slider:before {
+    transform: translateX(20px);
+}
+
+:root {
+    --primary: #1b4332;
+    --secondary: #2d6a4f;
+    --accent: #ffb703;
+    --bg: #f1f5f9;
+    --card-bg: #ffffff;
+    --danger: #d00000;
+    --warning: #fb8500;
+    --success: #38b000;
+    --text-main: #0f172a;
+    --text-sub: #64748b;
+}
+
+* {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    font-family: 'Sarabun', sans-serif;
+    background-color: var(--bg);
+    margin: 0;
+    padding: 0;
+    color: var(--text-main);
+}
+
+/* --- Header --- */
+.sticky-wrapper {
+    position: sticky;
+    top: 0;
+    background: var(--primary);
+    z-index: 1000;
+    padding: 15px 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.brand h1 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 800;
+    color: #ffffff;
+    letter-spacing: -0.5px;
+}
+
+.brand h1 span {
+    font-weight: 400;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.7);
+    display: block;
+}
+
+.btn-refresh {
+    background: var(--accent);
+    color: var(--primary);
+    border: none;
+    padding: 8px 16px;
+    border-radius: 12px;
+    font-weight: 800;
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* --- ส่วนปุ่ม 3D แบบเรียงแถวเดียว --- */
+.filter-group {
+    display: flex;
+    gap: 10px;
+    /* ระยะห่างระหว่างปุ่ม */
+    max-width: 800px;
+    margin: 15px auto 0 auto;
+}
+
+.f-card {
+    flex: 1;
+    background: #f8fafc;
+    border-radius: 16px;
+    padding: 10px 5px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+    /* เงาสองชั้นสร้างมิติความหนา (3D) */
+    box-shadow: 0 5px 0 #cbd5e1, 0 8px 12px rgba(0, 0, 0, 0.15);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    top: 0;
+}
+
+/* เอฟเฟกต์ตอนกดปุ่มจะยุบลง */
+.f-card:active {
+    top: 3px;
+    box-shadow: 0 2px 0 #cbd5e1, 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.f-card .val {
+    font-size: 24px;
+    font-weight: 800;
+    line-height: 1.2;
+    display: block;
+}
+
+.f-card .lab {
+    font-size: 11px;
+    font-weight: 700;
+    margin-top: 2px;
+    color: #64748b;
+}
+
+/* --- สถานะ 3D Active (เมื่อปุ่มถูกเลือก) --- */
+
+/* เลยกำหนด - สีแดง */
+.active-overdue {
+    background: #e11d48 !important;
+    box-shadow: 0 3px 0 #9f1239 !important;
+    top: 2px;
+}
+
+.active-overdue .val,
+.active-overdue .lab {
+    color: white !important;
+}
+
+/* ใกล้กำหนด - สีส้ม */
+.active-urgent {
+    background: #fb8500 !important;
+    box-shadow: 0 3px 0 #d97706 !important;
+    top: 2px;
+}
+
+.active-urgent .val,
+.active-urgent .lab {
+    color: white !important;
+}
+
+/* ทั้งหมด - สีเขียว */
+.active-all {
+    background: #22c55e !important;
+    box-shadow: 0 3px 0 #16a34a !important;
+    top: 2px;
+}
+
+.active-all .val,
+.active-all .lab {
+    color: white !important;
+}
+
+/* สีพาสเทลสำหรับสถานะปกติ (Inactive) */
+#f-overdue {
+    background-color: #fff1f2;
+}
+
+/* พาสเทลแดงอ่อน */
+#f-urgent {
+    background-color: #fffbeb;
+}
+
+/* พาสเทลเหลืองอ่อน */
+#f-all {
+    background-color: #f0fdf4;
+}
+
+/* พาสเทลเขียวอ่อน */
+
+.f-card .val {
+    font-size: 26px;
+    font-weight: 800;
+    line-height: 1.2;
+    display: block;
+}
+
+.f-card .lab {
+    font-size: 11px;
+    font-weight: 700;
+    margin-top: 2px;
+}
+
+.search-container {
+    max-width: 800px;
+    margin: 12px auto 0 auto;
+}
+
+.search-box {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 10px 15px;
+    display: flex;
+    align-items: center;
+    border: 2px solid #e2e8f0;
+}
+
+.search-box input {
+    border: none;
+    background: transparent;
+    width: 100%;
+    margin-left: 10px;
+    font-family: 'Sarabun';
+    font-size: 16px;
+    outline: none;
+}
+
+/* --- Card & Accordion --- */
+.container {
+    padding: 15px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+#serviceList {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 15px;
+}
+
+@media (min-width: 768px) {
+    #serviceList {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+.s-card {
+    background: white;
+    border-radius: 22px;
+    padding: 18px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+/* --- Card Pastel Highlights --- */
+.s-card.card-overdue {
+    background-color: #fff1f2 !important;
+    /* Pastel Red */
+    border: 1px solid #fecdd3 !important;
+}
+
+.s-card.card-urgent {
+    background-color: #fffbeb !important;
+    /* Pastel Yellow */
+    border: 1px solid #fef3c7 !important;
+}
+
+
+.client-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.client-info {
+    flex-grow: 1;
+    cursor: pointer;
+}
+
+.client-name {
+    font-size: 17px;
+    font-weight: 800;
+    color: var(--primary);
+}
+
+.client-loc {
+    font-size: 12px;
+    color: var(--text-sub);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.btn-nav {
+    background: #4285F4;
+    color: white;
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+}
+
+.toggle-btn {
+    background: #f8fafc;
+    color: var(--text-sub);
+    border: 1px solid #e2e8f0;
+    width: 100%;
+    padding: 8px;
+    border-radius: 10px;
+    margin-top: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+/* Detail Panel */
+.detail-mode {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out;
+}
+
+.detail-mode.show {
+    max-height: 1200px;
+    margin-top: 15px;
+    padding-top: 10px;
+    border-top: 1px dashed #e2e8f0;
+}
+
+.device-info {
+    background: #f1f5f9;
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 15px;
+    font-size: 12px;
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.info-row:last-child {
+    border: none;
+}
+
+.info-label {
+    font-weight: 800;
+    color: #64748b;
+    text-transform: uppercase;
+}
+
+.info-val {
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.pm-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.pm-step {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid #f1f5f9;
+}
+
+.pm-step.done {
+    border-color: var(--success);
+    background: #f7fee7;
+}
+
+.pm-step.overdue {
+    border-left: 5px solid var(--danger);
+    background: #fff1f2;
+}
+
+.pm-step.urgent {
+    border-left: 5px solid var(--warning);
+    background: #fff7ed;
+}
+
+textarea {
+    width: 100%;
+    border-radius: 12px;
+    border: 1.5px solid #e2e8f0;
+    padding: 12px;
+    font-family: 'Sarabun';
+    font-size: 14px;
+    margin-top: 15px;
+    resize: none;
+}
+
+.action-group {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.btn-save {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 14px;
+    border-radius: 12px;
+    font-weight: 800;
+    flex: 2;
+    cursor: pointer;
+}
+
+.btn-photo {
+    background: #475569;
+    color: white;
+    border: none;
+    padding: 14px;
+    border-radius: 12px;
+    flex: 1;
+    cursor: pointer;
+    text-align: center;
+}
+
+/* ปรับปุ่มบันทึกให้ดูทันสมัยขึ้น */
+.btn-save {
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.btn-save:disabled {
+    background: #94a3b8;
+    cursor: not-allowed;
+}
+
+/* ==========================================================================
+   หน้า Loading Screen ออกแบบระดับพรีเมียม (Full Screen Overlay with Animations)
+   ========================================================================== */
+.loader-main {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(15, 23, 42, 0.93); /* พื้นหลังสีเข้มหรูหราสไตล์ Dashboard */
+    backdrop-filter: blur(10px); /* เอฟเฟกต์กระจกฝ้าหน้าจอเบลอหลัง */
+    -webkit-backdrop-filter: blur(10px);
+    z-index: 99999 !important; /* แสดงผลอยู่เหนือทุก Element บนหน้าจอ */
+    text-align: center;
+    margin: 0;
+    padding: 0;
+}
+
+.loader-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: 320px;
+}
+
+/* ชุดวงแหวนสไตล์เทคโนโลยี */
+.custom-tech-loader {
+    position: relative;
+    width: 100px;
+    height: 100px;
+    margin-bottom: 25px;
+}
+
+.loader-ring {
+    position: absolute;
+    border-radius: 50%;
+    border: 4px solid transparent;
+}
+
+/* วงแหวนนอกสีทองแบรนด์ หมุนตามเข็ม */
+.ring-outer {
+    top: 0; left: 0; right: 0; bottom: 0;
+    border-top-color: var(--accent); 
+    border-bottom-color: var(--accent);
+    animation: spinClockwise 2s linear infinite;
+}
+
+/* วงแหวนในสีเขียวแบรนด์ หมุนทวนเข็ม */
+.ring-inner {
+    top: 12px; left: 12px; right: 12px; bottom: 12px;
+    border-left-color: var(--secondary); 
+    border-right-color: var(--secondary);
+    animation: spinCounterClockwise 1.3s linear infinite;
+}
+
+/* ไอคอนตรงกลาง */
+.loader-center-icon {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #ffffff;
+    font-size: 24px;
+}
+
+.fa-spin-custom {
+    animation: spinClockwise 4s linear infinite;
+}
+
+/* ข้อความสถานะการโหลดและเอฟเฟกต์กระพริบ (Breathing Glow) */
+.loader-text {
+    font-size: 17px;
+    font-weight: 700;
+    color: #ffffff;
+    margin-top: 10px;
+    letter-spacing: 0.5px;
+    animation: pulseText 1.5s infinite alternate ease-in-out;
+}
+
+.loader-subtext {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--accent);
+    margin-top: 6px;
+    letter-spacing: 2px;
+    opacity: 0.8;
+}
+
+/* แถบหลอดแก้วแสดงความก้าวหน้า (Progress Bar Animation) */
+.loader-bar-wrapper {
+    width: 150px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    margin-top: 22px;
+    overflow: hidden;
+    position: relative;
+}
+
+.loader-progress-bar {
+    width: 60px;
+    height: 100%;
+    background: linear-gradient(90deg, var(--secondary), var(--accent));
+    border-radius: 10px;
+    position: absolute;
+    animation: loadingBarMove 1.8s infinite ease-in-out;
+}
+
+/* --- บล็อกสร้าง Animation Keyframes --- */
+@keyframes spinClockwise {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes spinCounterClockwise {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(-360deg); }
+}
+
+@keyframes pulseText {
+    0% { opacity: 0.5; transform: scale(0.97); }
+    100% { opacity: 1; transform: scale(1.02); }
+}
+
+@keyframes loadingBarMove {
+    0% { left: -60px; }
+    50% { left: 150px; }
+    100% { left: -60px; }
+}
+
+#showRenewOnlySwitch:checked+.compact-slider {
+    background-color: var(--accent) !important;
+}
+
+.btn-clear {
+    padding: 8px 15px;
+    border: none;
+    border-radius: 12px;
+    background: #6c757d;
+    color: white;
+    font-size: 14px;
+    cursor: pointer;
+    transition: 0.3s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.btn-clear:hover {
+    background: #5a6268;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Animation สำหรับไอคอนหมุนวน */
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.fa-spin-custom {
+    animation: spin 1s linear infinite;
+    display: inline-block;
+}
