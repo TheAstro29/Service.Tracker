@@ -633,23 +633,28 @@ textarea {
     animation: spinClockwise 4s linear infinite;
 }
 
-/* ข้อความสถานะการโหลดและเอฟเฟกต์กระพริบ (Breathing Glow) */
 .loader-text {
-    font-size: 17px;
-    font-weight: 700;
-    color: #ffffff;
+    font-size: 13px !important;       /* ลดขนาดลงเล็กน้อยเพื่อให้สมดุลกับชื่อแอป */
+    font-weight: 400;                 /* ใช้ตัวบางลง */
+    color: rgba(255, 255, 255, 0.7);  /* เปลี่ยนเป็นสีขาวนวลแบบโปร่งแสงเล็กน้อย */
     margin-top: 10px;
-    letter-spacing: 0.5px;
-    animation: pulseText 1.5s infinite alternate ease-in-out;
+    letter-spacing: 1px;
+    /* คงแอนิเมชันกระพริบ (Breathing) ไว้เช่นเดิม */
+    animation: pulseText 1.5s infinite alternate ease-in-out; 
 }
 
 .loader-subtext {
-    font-size: 11px;
-    font-weight: 800;
-    color: var(--accent);
-    margin-top: 6px;
-    letter-spacing: 2px;
-    opacity: 0.8;
+    font-size: 24px !important;       /* ขยายขนาดให้ใหญ่ขึ้นอย่างเด่นชัด (จากเดิม 11px) */
+    font-weight: 800;                 /* ความหนาตัวอักษรสูงสุด */
+    color: var(--accent);             /* ใช้สีเหลืองทองประจำแบรนด์ C2TECH */
+    margin-top: 12px;
+    letter-spacing: 3px;              /* เพิ่มระยะห่างระหว่างตัวอักษรเพิ่มความโมเดิร์นและอ่านง่าย */
+    opacity: 1 !important;            /* ปรับความเข้มเต็ม 100% ไม่ให้จาง */
+    text-transform: uppercase;         /* บังคับเป็นตัวพิมพ์ใหญ่ทั้งหมด */
+    
+    /* เอฟเฟกต์เติมแสงนีออนเรืองรอง (Glow Effect) ทำให้ชื่อแอปดูมีมิติและเท่ขึ้นมาก */
+    text-shadow: 0 0 15px rgba(255, 183, 3, 0.6), 
+                 0 0 30px rgba(255, 183, 3, 0.3); 
 }
 
 /* แถบหลอดแก้วแสดงความก้าวหน้า (Progress Bar Animation) */
