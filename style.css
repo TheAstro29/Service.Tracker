@@ -731,6 +731,11 @@ input:checked + .compact-slider:before {
     accent-color: #94a3b8;
 }
 
+.pm-step.needs-photo input[type="checkbox"] {
+    cursor: not-allowed;
+    accent-color: #c2410c;
+}
+
 .step-info { flex: 1; min-width: 0; }
 
 /* --- Note / Actions --- */

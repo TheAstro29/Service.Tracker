@@ -183,24 +183,35 @@ function render() {
             const pDate = new Date(plannedDateVal);
             const isDone = !!activeDateVal;
             const actualDate = isDone ? new Date(activeDateVal).toLocaleDateString('en-GB') : '';
-            let stepState = isDone ? 'done' : (pDate < now ? 'overdue' : (pDate <= limit ? 'urgent' : ''));
+            const baseState = isDone ? 'done' : (pDate < now ? 'overdue' : (pDate <= limit ? 'urgent' : ''));
 
             // ป้องกันการกดข้ามขั้น: ต้องปิดงาน PM ก่อนหน้าให้เสร็จก่อน ถึงจะเปิดให้กด checkbox รอบนี้ได้
             const isLocked = !isDone && !prevStepDone;
-            if (isLocked) stepState = 'locked';
+            // บังคับให้แนบรูปหน้างานก่อน จึงจะติ๊กเช็คปิดงานได้ (กันลืมถ่ายรูปหลักฐาน)
+            const needsPhoto = !isDone && !isLocked && !photoUrl;
+
+            // สำคัญ: ใส่ locked/needs-photo เป็น class "เสริม" ต่อจาก baseState เสมอ ห้ามเขียนทับ overdue/urgent เดิม
+            // เพราะ runFilters() นับจำนวนเลยกำหนด/ใกล้กำหนดจาก class .pm-step.overdue / .pm-step.urgent ตรงๆ
+            // ถ้าเขียนทับ จะทำให้รายการที่เลยกำหนดแต่ยังไม่แนบรูป (ซึ่งเป็นเกือบทุกรายการ) หายไปจากการนับทันที
+            let stepState = baseState;
+            if (isLocked) stepState += ' locked';
+            else if (needsPhoto) stepState += ' needs-photo';
 
             if (!isDone && !isLocked) {
-                if (stepState === 'overdue') cardState = 'card-overdue';
-                else if (stepState === 'urgent' && cardState !== 'card-overdue') cardState = 'card-urgent';
+                if (baseState === 'overdue') cardState = 'card-overdue';
+                else if (baseState === 'urgent' && cardState !== 'card-overdue') cardState = 'card-urgent';
             }
+
+            const checkboxTitle = isLocked ? `ต้องปิดงาน PM${idx - 1} ให้เสร็จก่อน` : (needsPhoto ? 'ต้องแนบรูปหน้างานก่อน' : '');
 
             stepsHTML += `
                     <div class="pm-step ${stepState}">
-                        <input type="checkbox" onchange="handleCheck(this,'${sn}','PM${idx}')" ${isDone ? 'checked disabled' : ''} ${isLocked ? 'disabled' : ''} title="${isLocked ? `ต้องปิดงาน PM${idx - 1} ให้เสร็จก่อน` : ''}">
+                        <input type="checkbox" onchange="handleCheck(this,'${sn}','PM${idx}')" ${isDone ? 'checked disabled' : ''} ${(isLocked || needsPhoto) ? 'disabled' : ''} title="${checkboxTitle}">
                         <div class="step-info">
                             <div style="font-weight: 700; display:flex; align-items:center; gap:6px;">
                                 PM รอบที่ ${idx}
                                 ${isLocked ? `<span style="font-size:10px; font-weight:700; color:#94a3b8; background:#f1f5f9; padding:2px 8px; border-radius:999px;"><i class="fas fa-lock"></i> รอ PM${idx - 1}</span>` : ''}
+                                ${needsPhoto ? `<span style="font-size:10px; font-weight:700; color:#c2410c; background:#ffedd5; padding:2px 8px; border-radius:999px;"><i class="fas fa-camera"></i> ต้องแนบรูปก่อน</span>` : ''}
                             </div>
                             <div style="font-size: 11px; color: var(--text-sub);">แผน: ${pDate.toLocaleDateString('en-GB')}</div>
                             ${isDone ? `<div style="font-size: 11px; color: var(--success); font-weight: bold;"><i class="fas fa-check-circle"></i> เข้าจริง: ${actualDate}</div>` : ''}
@@ -210,8 +221,8 @@ function render() {
                             ${isLocked ? `<div style="font-size:11px; color:#94a3b8; margin-top:4px;"><i class="fas fa-circle-info"></i> ต้องปิดงาน PM${idx - 1} ให้เสร็จก่อน จึงจะบันทึกรอบนี้ได้</div>` : ''}
                             ${!isDone && !isLocked ? `
                                 <div style="margin-top:5px;">
-                                    <button onclick="document.getElementById('img-${sn}-PM${idx}').click()" style="font-size:10px; padding:2px 8px; border-radius:5px; border:1px solid #ccc; background:#fff;">
-                                        <i class="fas fa-camera"></i> แนบรูป PM${idx}
+                                    <button onclick="capturePhotoForStep('${sn}', 'PM${idx}')" style="font-size:11px; padding:5px 10px; border-radius:6px; border:none; background:${needsPhoto ? '#c2410c' : '#475569'}; color:#fff; font-weight:700; cursor:pointer;">
+                                        <i class="fas fa-camera"></i> ${needsPhoto ? 'แนบรูปหน้างาน (บังคับ)' : 'ถ่ายรูปใหม่'}
                                     </button>
                                     <input type="file" id="img-${sn}-PM${idx}" accept="image/*" capture="environment" style="display:none" onchange="uploadPhotoByStep('${sn}', 'PM${idx}', this)">
                                 </div>
@@ -526,56 +537,180 @@ function smartToggle(m) {
 loadFromCache();
 loadData();
 
-async function uploadPhotoByStep(sn, pmStep, input) {
-    if (!input.files || input.files.length === 0) return;
-    const file = input.files[0];
+// อ่านไฟล์เป็น Data URL (ใช้กับ fallback file input)
+function readFileAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
 
-    Swal.fire({ title: 'กำลังอัปโหลด...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-
-    const reader = new FileReader();
-    reader.onload = async (e) => {
+// ย่อขนาดรูปก่อนส่ง (ทั้งจากกล้องในแอปและจากไฟล์ที่เลือก) ให้ผ่าน POST ได้ไวและประหยัดพื้นที่ Drive
+function resizeImageDataUrl(dataUrl, maxWidth = 800, quality = 0.6) {
+    return new Promise((resolve, reject) => {
         const img = new Image();
-        img.onload = async () => {
+        img.onload = () => {
             const canvas = document.createElement('canvas');
-            // ปรับลดเหลือ 800px เพื่อให้ส่งผ่าน iframe ได้ชัวร์ๆ
-            let w = 800;
+            const w = Math.min(maxWidth, img.width);
             canvas.width = w;
             canvas.height = img.height * (w / img.width);
             canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = reject;
+        img.src = dataUrl;
+    });
+}
 
-            // ปรับคุณภาพเหลือ 0.6 (ประหยัดพื้นที่และส่งไวขึ้น)
-            const imageData = canvas.toDataURL('image/jpeg', 0.6);
+// ฟังก์ชันกลางสำหรับย่อรูป+ส่งขึ้น Drive ใช้ร่วมกันทั้งจากกล้องในแอปและ fallback file picker
+async function uploadImageForStep(sn, pmStep, rawDataUrlOrFile) {
+    Swal.fire({ title: 'กำลังอัปโหลด...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    try {
+        const rawDataUrl = (rawDataUrlOrFile instanceof File)
+            ? await readFileAsDataUrl(rawDataUrlOrFile)
+            : rawDataUrlOrFile;
 
-            try {
-                const response = await fetch(SCRIPT_URL, {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        sn: sn,
-                        action: 'photo',
-                        pmStep: pmStep,
-                        image: imageData,
-                        fileName: `PM_IMG_${sn}_${pmStep}_${Date.now()}.jpg`
-                    }),
-                    headers: { "Content-Type": "text/plain;charset=utf-8" }
-                });
-                const result = await response.json();
+        const imageData = await resizeImageDataUrl(rawDataUrl, 800, 0.6);
 
-                if (result.status !== "success") {
-                    throw new Error(result.message || "อัปโหลดไม่สำเร็จ");
+        const response = await fetch(SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                sn: sn,
+                action: 'photo',
+                pmStep: pmStep,
+                image: imageData,
+                fileName: `PM_IMG_${sn}_${pmStep}_${Date.now()}.jpg`
+            }),
+            headers: { "Content-Type": "text/plain;charset=utf-8" }
+        });
+        const result = await response.json();
+
+        if (result.status !== "success") {
+            throw new Error(result.message || "อัปโหลดไม่สำเร็จ");
+        }
+
+        Swal.close();
+        Toast.fire({ icon: 'success', title: 'อัปโหลดรูปสำเร็จ' });
+        loadData(true);
+    } catch (err) {
+        console.error("Upload photo by step error:", err);
+        Swal.fire({ icon: 'error', title: 'อัปโหลดไม่สำเร็จ', text: err.message || 'กรุณาลองใหม่อีกครั้ง' });
+    }
+}
+
+// ทางเลือกสำรอง: ใช้ file picker ปกติ (input[type=file]) — ใช้เมื่อเปิดกล้องในแอปไม่ได้เท่านั้น
+async function uploadPhotoByStep(sn, pmStep, input) {
+    if (!input.files || input.files.length === 0) return;
+    await uploadImageForStep(sn, pmStep, input.files[0]);
+    input.value = ''; // เคลียร์ไว้เผื่อเลือกไฟล์เดิมซ้ำได้อีกครั้ง
+}
+
+// --- กล้องถ่ายรูปในแอป (แก้ปัญหา capture="environment" ของ input file ไม่เสถียรบน Android บางเครื่อง) ---
+async function capturePhotoForStep(sn, pmStep) {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        // เบราว์เซอร์นี้ไม่รองรับกล้องในเว็บ -> fallback ไปใช้ file picker ปกติทันที
+        document.getElementById(`img-${sn}-${pmStep}`).click();
+        return;
+    }
+
+    const captureResult = await openCameraCapture();
+
+    if (captureResult === 'FALLBACK') {
+        document.getElementById(`img-${sn}-${pmStep}`).click();
+        return;
+    }
+    if (!captureResult) return; // ผู้ใช้กดยกเลิก
+
+    await uploadImageForStep(sn, pmStep, captureResult);
+}
+
+// เปิด modal กล้องถ่ายรูป คืนค่าเป็น Data URL ของรูปที่ถ่าย, null ถ้ายกเลิก, หรือ 'FALLBACK' ถ้าเปิดกล้องไม่ได้
+function openCameraCapture() {
+    return new Promise((resolve) => {
+        let stream = null;
+        let capturedDataUrl = null;
+        let cameraFailed = false;
+
+        Swal.fire({
+            title: 'ถ่ายรูปหน้างาน',
+            html: `
+                <div style="position:relative; background:#000; border-radius:12px; overflow:hidden;">
+                    <video id="cam-video" autoplay playsinline muted style="width:100%; max-height:55vh; display:block; background:#000;"></video>
+                    <img id="cam-preview" style="width:100%; max-height:55vh; display:none; object-fit:contain; background:#000;">
+                </div>
+                <div id="cam-shutter-group" style="margin-top:14px;">
+                    <button id="cam-shutter-btn" type="button" style="background:#1b4332; color:#fff; border:none; width:60px; height:60px; border-radius:50%; font-size:20px; cursor:pointer;">
+                        <i class="fas fa-camera"></i>
+                    </button>
+                </div>
+                <div id="cam-retake-group" style="display:none; margin-top:14px;">
+                    <button id="cam-retake-btn" type="button" style="background:#64748b; color:#fff; border:none; padding:10px 18px; border-radius:10px; cursor:pointer; font-weight:700;">
+                        <i class="fas fa-rotate-left"></i> ถ่ายใหม่
+                    </button>
+                </div>
+                <div style="font-size:11px; color:#94a3b8; margin-top:10px;">ถ้าเปิดกล้องไม่ติด ระบบจะสลับไปใช้ปุ่มเลือกไฟล์แทนให้อัตโนมัติ</div>
+            `,
+            width: '480px',
+            showCancelButton: true,
+            showConfirmButton: true,
+            confirmButtonText: 'ใช้รูปนี้',
+            confirmButtonColor: '#1b4332',
+            cancelButtonText: 'ยกเลิก',
+            allowOutsideClick: false,
+            didOpen: async () => {
+                const video = document.getElementById('cam-video');
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+                    video.srcObject = stream;
+                } catch (err) {
+                    console.error('Camera error:', err);
+                    cameraFailed = true;
+                    Swal.close();
+                    return;
                 }
 
-                Swal.close();
-                Toast.fire({ icon: 'success', title: 'อัปโหลดรูปสำเร็จ' });
-                loadData(true);
-            } catch (err) {
-                console.error("Upload photo by step error:", err);
-                Swal.fire({ icon: 'error', title: 'อัปโหลดไม่สำเร็จ', text: err.message || 'กรุณาลองใหม่อีกครั้ง' });
+                document.getElementById('cam-shutter-btn').onclick = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = video.videoWidth || 800;
+                    canvas.height = video.videoHeight || 600;
+                    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+                    capturedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+                    document.getElementById('cam-preview').src = capturedDataUrl;
+                    document.getElementById('cam-preview').style.display = 'block';
+                    video.style.display = 'none';
+                    document.getElementById('cam-shutter-group').style.display = 'none';
+                    document.getElementById('cam-retake-group').style.display = 'block';
+                };
+
+                document.getElementById('cam-retake-btn').onclick = () => {
+                    capturedDataUrl = null;
+                    document.getElementById('cam-preview').style.display = 'none';
+                    video.style.display = 'block';
+                    document.getElementById('cam-shutter-group').style.display = 'block';
+                    document.getElementById('cam-retake-group').style.display = 'none';
+                };
+            },
+            preConfirm: () => {
+                if (!capturedDataUrl) {
+                    Swal.showValidationMessage('กรุณากดปุ่มถ่ายรูปก่อน');
+                    return false;
+                }
+                return capturedDataUrl;
+            },
+            willClose: () => {
+                if (stream) stream.getTracks().forEach(t => t.stop()); // ปิดกล้องเสมอตอนออกจาก modal (สำคัญมาก ไม่งั้นกล้องค้างเปิดอยู่)
             }
-        };
-        img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
+        }).then((result) => {
+            if (cameraFailed) { resolve('FALLBACK'); return; }
+            if (result.isConfirmed) resolve(result.value);
+            else resolve(null);
+        });
+    });
 }
+
 function clearAllFilters() {
     // 1. ล้างช่องค้นหา (ID ในไฟล์นี้คือ mainSearch)
     const mainSearch = document.getElementById('mainSearch');
