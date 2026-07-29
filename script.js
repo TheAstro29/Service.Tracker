@@ -1,4 +1,4 @@
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzwrX0wwwKDAbYdlZpRPrqWAt8ROsmRZx4GAGL9eaG9N6nIBQvIJeahiksg63zoEL3Y/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzg3xerzF-PyafFe67HV9eUfNZFuDxTK1h8AhGixnOkW0_Tt993TR3FjCy3652NXMHR/exec";
 let appData = [];
 let currentMode = 'all';
 
