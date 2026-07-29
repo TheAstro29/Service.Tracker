@@ -1,15 +1,26 @@
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzg3xerzF-PyafFe67HV9eUfNZFuDxTK1h8AhGixnOkW0_Tt993TR3FjCy3652NXMHR/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwTreMfsLHYUq7TEW8nu7brQKyuLL-ALyRRa4pdzNFopY-TlRg4UXo3Ei4AVLk-KOv0/exec?app=service";
 let appData = [];
 let currentMode = 'all';
 
+// Toast แจ้งเตือนเล็กๆ มุมขวาบน ใช้แทน popup เต็มจอเวลาบันทึกสำเร็จ (ไม่บล็อกการใช้งานต่อ)
+const Toast = Swal.mixin({
+    toast: true,
+    position: 'top-end',
+    showConfirmButton: false,
+    timer: 2000,
+    timerProgressBar: true
+});
+
 // 1. กำหนดรหัสผ่านและการเข้าถึง
 let isAdmin = false;
+let adminPasswordCache = ''; // เก็บรหัสไว้ใน memory เท่านั้น เพื่อส่งให้ backend เช็คซ้ำทุกครั้งที่ Renew
 const _0x1a2b = "MTkwOTE1MTI="
 
 // ฟังก์ชันเข้าสู่ระบบ
 async function adminAuth() {
     if (isAdmin) {
         isAdmin = false;
+        adminPasswordCache = '';
         document.getElementById('lockIcon').className = 'fas fa-lock admin-login-btn';
         Swal.fire({ icon: 'info', title: 'ออกจากระบบ Admin', timer: 1000, showConfirmButton: false });
         render();
@@ -24,8 +35,11 @@ async function adminAuth() {
         confirmButtonColor: '#1b4332'
     });
 
+    if (password === undefined) return; // กดยกเลิก
+
     if (btoa(password) === _0x1a2b) {
         isAdmin = true;
+        adminPasswordCache = password;
         document.getElementById('lockIcon').className = 'fas fa-lock-open admin-login-btn active';
         Swal.fire({ icon: 'success', title: 'ยินดีต้อนรับ Admin', timer: 1000, showConfirmButton: false });
         render();
@@ -33,20 +47,43 @@ async function adminAuth() {
         Swal.fire({ icon: 'error', title: 'รหัสผ่านไม่ถูกต้อง' });
     }
 }
-async function loadData() {
-    document.getElementById('refreshIcon').classList.add('fa-spin');
-    document.getElementById('loading').style.display = 'block';
+const CACHE_KEY = "c2tech_service_data_v1";
+
+// โหลดข้อมูลที่ cache ไว้ล่าสุดมาโชว์ก่อนทันที (ระหว่างรอ fetch ข้อมูลใหม่จริงจาก Sheets)
+// ช่วยเวลาเน็ตช้า/หลุดที่หน้างาน อย่างน้อยยังเห็นข้อมูลล่าสุดที่เคยโหลดได้ ไม่ใช่หน้าขาวรอเฉยๆ
+function loadFromCache() {
+    try {
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (cached) {
+            appData = JSON.parse(cached);
+            render();
+            document.getElementById('loading').style.display = 'none';
+        }
+    } catch (e) {
+        console.error("Load cache error:", e);
+    }
+}
+
+async function loadData(silent = false) {
+    if (!silent) {
+        document.getElementById('refreshIcon').classList.add('fa-spin');
+        document.getElementById('loading').style.display = 'block';
+    }
     try {
         const res = await fetch(SCRIPT_URL);
         appData = await res.json();
         render();
-        // --- เพิ่มบรรทัดนี้ ---
-        checkNotice();
-        // -------------------
-    } catch (e) { Swal.fire('Error', 'โหลดข้อมูลไม่สำเร็จ', 'error'); }
+        localStorage.setItem(CACHE_KEY, JSON.stringify(appData)); // เก็บ cache ไว้ใช้ครั้งหน้า
+        if (!silent) checkNotice(); // แจ้งเตือนเสียง/popup เฉพาะตอนโหลดแบบเต็ม ไม่ใช่ตอน silent refresh
+    } catch (e) {
+        console.error("Load data error:", e);
+        if (!silent) Swal.fire('Error', 'โหลดข้อมูลไม่สำเร็จ (แสดงข้อมูลล่าสุดที่เคยบันทึกไว้แทน)', 'error');
+    }
     finally {
-        document.getElementById('refreshIcon').classList.remove('fa-spin');
-        document.getElementById('loading').style.display = 'none';
+        if (!silent) {
+            document.getElementById('refreshIcon').classList.remove('fa-spin');
+            document.getElementById('loading').style.display = 'none';
+        }
     }
 }
 
@@ -100,6 +137,17 @@ function playNoticeSound() {
     }
 }
 
+// ป้องกัน XSS: escape อักขระที่มีความหมายพิเศษใน HTML ก่อนแสดงผลข้อมูลที่มาจาก Sheets/ฟอร์ม
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 function render() {
     const main = document.getElementById('serviceList');
     main.innerHTML = '';
@@ -123,63 +171,83 @@ function render() {
         const isRenewed = statusYearVal.includes("ต่อรายปี");
         let stepsHTML = '';
         let cardState = '';
+        let prevStepDone = true; // PM1 ไม่มีเงื่อนไขก่อนหน้า จึงเริ่มที่ true
 
         [1, 2, 3].forEach((idx) => {
             const plannedDateVal = m[`PM${idx}_Date`];
             const activeDateVal = m[`PM${idx}_Status`];
             const photoUrl = m[`PM${idx}_Photo`];
+            const gpsVal = m[`PM${idx}_GPS`];
+            const techVal = m[`PM${idx}_Tech`];
             if (!plannedDateVal) return;
             const pDate = new Date(plannedDateVal);
             const isDone = !!activeDateVal;
             const actualDate = isDone ? new Date(activeDateVal).toLocaleDateString('en-GB') : '';
             let stepState = isDone ? 'done' : (pDate < now ? 'overdue' : (pDate <= limit ? 'urgent' : ''));
 
-            if (!isDone) {
+            // ป้องกันการกดข้ามขั้น: ต้องปิดงาน PM ก่อนหน้าให้เสร็จก่อน ถึงจะเปิดให้กด checkbox รอบนี้ได้
+            const isLocked = !isDone && !prevStepDone;
+            if (isLocked) stepState = 'locked';
+
+            if (!isDone && !isLocked) {
                 if (stepState === 'overdue') cardState = 'card-overdue';
                 else if (stepState === 'urgent' && cardState !== 'card-overdue') cardState = 'card-urgent';
             }
 
             stepsHTML += `
                     <div class="pm-step ${stepState}">
-                        <input type="checkbox" onchange="handleCheck(this,'${sn}','PM${idx}')" ${isDone ? 'checked disabled' : ''}>
+                        <input type="checkbox" onchange="handleCheck(this,'${sn}','PM${idx}')" ${isDone ? 'checked disabled' : ''} ${isLocked ? 'disabled' : ''} title="${isLocked ? `ต้องปิดงาน PM${idx - 1} ให้เสร็จก่อน` : ''}">
                         <div class="step-info">
-                            <div style="font-weight: 700;">PM รอบที่ ${idx}</div>
+                            <div style="font-weight: 700; display:flex; align-items:center; gap:6px;">
+                                PM รอบที่ ${idx}
+                                ${isLocked ? `<span style="font-size:10px; font-weight:700; color:#94a3b8; background:#f1f5f9; padding:2px 8px; border-radius:999px;"><i class="fas fa-lock"></i> รอ PM${idx - 1}</span>` : ''}
+                            </div>
                             <div style="font-size: 11px; color: var(--text-sub);">แผน: ${pDate.toLocaleDateString('en-GB')}</div>
                             ${isDone ? `<div style="font-size: 11px; color: var(--success); font-weight: bold;"><i class="fas fa-check-circle"></i> เข้าจริง: ${actualDate}</div>` : ''}
+                            ${isDone && techVal ? `<div style="font-size: 11px; color: var(--text-sub);"><i class="fas fa-user"></i> ผู้ปฏิบัติงาน: ${escapeHtml(techVal)}</div>` : ''}
                             ${photoUrl ? `<a href="${photoUrl}" target="_blank" style="color:var(--secondary); font-size:11px; text-decoration:none; margin-top:3px; display:inline-block;"><i class="fas fa-image"></i> ดูรูปงาน</a>` : ''} 
-                            ${!isDone ? `
+                            ${gpsVal && gpsVal !== 'No GPS' ? `<a href="${gpsVal}" target="_blank" style="color:#4285F4; font-size:11px; text-decoration:none; margin-top:3px; margin-left:8px; display:inline-block;"><i class="fas fa-map-marker-alt"></i> ดูตำแหน่ง GPS</a>` : ''}
+                            ${isLocked ? `<div style="font-size:11px; color:#94a3b8; margin-top:4px;"><i class="fas fa-circle-info"></i> ต้องปิดงาน PM${idx - 1} ให้เสร็จก่อน จึงจะบันทึกรอบนี้ได้</div>` : ''}
+                            ${!isDone && !isLocked ? `
                                 <div style="margin-top:5px;">
                                     <button onclick="document.getElementById('img-${sn}-PM${idx}').click()" style="font-size:10px; padding:2px 8px; border-radius:5px; border:1px solid #ccc; background:#fff;">
                                         <i class="fas fa-camera"></i> แนบรูป PM${idx}
                                     </button>
-                                    <input type="file" id="img-${sn}-PM${idx}" accept="image/*" style="display:none" onchange="uploadPhotoByStep('${sn}', 'PM${idx}', this)">
+                                    <input type="file" id="img-${sn}-PM${idx}" accept="image/*" capture="environment" style="display:none" onchange="uploadPhotoByStep('${sn}', 'PM${idx}', this)">
                                 </div>
                             ` : ''} 
                         </div>
                     </div>`;
+
+            prevStepDone = isDone;
         });
 
         const card = document.createElement('div');
         card.className = `s-card ${cardState}`;
         card.setAttribute('data-sn', sn);
         card.setAttribute('data-renew', isRenewed);
+        card.setAttribute('data-mode', modeVal);
+        card.setAttribute('data-type', typeVal);
 
         // สร้างส่วน UI ของ Renew โดยเช็คเงื่อนไข isAdmin
         const renewUI = isAdmin ? `
-                <div style="margin-top:15px; border-top:1px dashed #ccc; padding-top:10px;">
-                    <label style="font-size:11px; font-weight:800; color:var(--primary)">ต่ออายุ Service รายปี (ระบุวันที่เริ่ม)</label>
-                    <div class="action-group" style="display:flex; gap:5px; margin-top:5px;">
-                        <input type="date" id="renew-${sn}" style="flex:2; padding:8px; border-radius:8px; border:1px solid #ddd;">
-                        <button class="btn-save" onclick="renewService('${sn}')" style="background:var(--secondary); flex:1; padding:8px;">เริ่มรอบใหม่</button>
+                <div style="margin-top:15px; border-top:1px dashed var(--border); padding-top:12px;">
+                    <label style="font-size:11px; font-weight:800; color:var(--primary); display:flex; align-items:center; gap:6px;"><i class="fas fa-rotate"></i> ต่ออายุ Service รายปี (ระบุวันที่เริ่ม)</label>
+                    <div class="action-group" style="margin-top:8px;">
+                        <input type="date" id="renew-${sn}" style="flex:2; padding:10px; border-radius:var(--r-md); border:1.5px solid var(--border); font-family:'Sarabun'; font-size:13px;">
+                        <button class="btn-save" onclick="renewService('${sn}')" style="background:var(--secondary); flex:1;"><i class="fas fa-check"></i> เริ่มรอบใหม่</button>
                     </div>
                 </div>` : '';
 
         card.innerHTML = `
-                    ${isRenewed ? '<div class="status-badge">ต่อรายปี</div>' : ''} 
+                    ${isRenewed ? '<div class="status-badge"><i class="fas fa-star"></i> ต่อรายปี</div>' : ''} 
                     <div class="client-header">
                         <div class="client-info" onclick="toggleDetail('${sn}')">
-                            <div class="client-name">${client}</div>
-                            <div class="client-loc"><i class="fas fa-map-marker-alt"></i> ${location} | S/N: ${sn}</div>
+                            <div class="client-avatar"><i class="fas fa-industry"></i></div>
+                            <div>
+                                <div class="client-name">${escapeHtml(client)}</div>
+                                <div class="client-loc"><i class="fas fa-map-marker-alt"></i> ${escapeHtml(location)} &nbsp;•&nbsp; S/N: ${escapeHtml(sn)}</div>
+                            </div>
                         </div>
                     </div>
                     <button class="toggle-btn" onclick="toggleDetail('${sn}')" id="btn-${sn}">
@@ -187,14 +255,13 @@ function render() {
                     </button>
                     <div class="detail-mode" id="detail-${sn}">
                         <div class="device-info">
-                            <div class="info-row"><span class="info-label">S/N:</span><span class="info-val">${sn}</span></div>
-                            <div class="info-row"><span class="info-label">Model:</span><span class="info-val">${modelVal}</span></div>
-                            <!-- ส่วนที่เพิ่มใหม่ -->
+                            <div class="info-row"><span class="info-label">S/N</span><span class="info-val">${escapeHtml(sn)}</span></div>
+                            <div class="info-row"><span class="info-label">Model</span><span class="info-val">${escapeHtml(modelVal)}</span></div>
                             <div class="info-row">
-                                <span class="info-label">Mode / Type:</span>
+                                <span class="info-label">Mode / Type</span>
                                 <span class="info-val">
-                                    <span style="color: var(--secondary);">${modeVal}</span> / 
-                                    <span style="color: #4285F4;">${typeVal}</span>
+                                    <span style="color: var(--secondary);">${escapeHtml(modeVal)}</span> / 
+                                    <span style="color: var(--info);">${escapeHtml(typeVal)}</span>
                                 </span>
                             </div>
                         </div>
@@ -203,7 +270,7 @@ function render() {
                     <!-- ใส่ส่วน Renew UI ที่ประมวลผลแล้วตรงนี้ -->
                     ${renewUI}
 
-                    <textarea id="n-${sn}" rows="2" placeholder="เพิ่มหมายเหตุ...">${m["Admin_Note"] || ""}</textarea>
+                    <textarea id="n-${sn}" rows="2" placeholder="เพิ่มหมายเหตุ...">${escapeHtml(m["Admin_Note"]) || ""}</textarea>
                     <div class="action-group">
                         <button class="btn-save" style="flex: 1;" onclick="updateNote('${sn}', this)">
                             <i class="fas fa-save"></i> บันทึกหมายเหตุ
@@ -224,51 +291,85 @@ function toggleDetail(sn) {
         : '<i class="fas fa-chevron-down"></i> ดูรายละเอียดและบันทึก';
 }
 
-// --- ฟังก์ชันบันทึกข้อมูลแบบปิด GPS ---
+// ดึงพิกัด GPS จริงจากเบราว์เซอร์ แปลงเป็นลิงก์ Google Maps ให้กดดูตำแหน่งได้ทันที
+// ถ้าเบราว์เซอร์ไม่รองรับ หรือผู้ใช้ไม่อนุญาต จะคืนค่า 'No GPS' แทน (ไม่ทำให้การบันทึกล้มเหลว)
+function getGpsLink() {
+    return new Promise((resolve) => {
+        if (!navigator.geolocation) return resolve('No GPS');
+        navigator.geolocation.getCurrentPosition(
+            (pos) => resolve(`https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`),
+            () => resolve('No GPS'), // ผู้ใช้กด Deny หรือหาตำแหน่งไม่ได้
+            { enableHighAccuracy: true, timeout: 6000, maximumAge: 60000 }
+        );
+    });
+}
+
+// --- ฟังก์ชันบันทึกข้อมูลพร้อม GPS จริงและชื่อช่างผู้ปฏิบัติงาน ---
 async function handleCheck(box, sn, stepKey) {
     if (!box.checked) return;
 
+    const savedTechName = localStorage.getItem('tech_name') || '';
+
     const confirm = await Swal.fire({
         title: 'ยืนยันปิดงาน?',
-        text: "คุณต้องการบันทึกการเข้าบริการในครั้งนี้ใช่หรือไม่?",
+        html: `
+            <p style="margin-bottom:12px; color:#475569;">คุณต้องการบันทึกการเข้าบริการในครั้งนี้ใช่หรือไม่?</p>
+            <input id="swal-tech-name" class="swal2-input" placeholder="ชื่อช่างผู้ปฏิบัติงาน" value="${escapeHtml(savedTechName)}" style="margin:0;">
+        `,
         icon: 'question',
         showCancelButton: true,
         confirmButtonColor: '#1b4332',
         confirmButtonText: 'ตกลง',
-        cancelButtonText: 'ยกเลิก'
+        cancelButtonText: 'ยกเลิก',
+        preConfirm: () => document.getElementById('swal-tech-name').value.trim()
     });
 
-    if (confirm.isConfirmed) {
-        Swal.fire({
-            title: 'กำลังบันทึก...',
-            allowOutsideClick: false,
-            didOpen: () => Swal.showLoading()
+    if (!confirm.isConfirmed) { box.checked = false; return; }
+
+    const techName = confirm.value;
+    if (techName) localStorage.setItem('tech_name', techName); // จำชื่อไว้ ไม่ต้องพิมพ์ซ้ำครั้งหน้า
+
+    Swal.fire({
+        title: 'กำลังตรวจสอบตำแหน่ง GPS...',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+    });
+
+    const gpsLink = await getGpsLink();
+    Swal.update({ title: 'กำลังบันทึก...' });
+
+    try {
+        // สร้างวันปัจจุบันในรูปแบบ ค.ศ.
+        const now = new Date();
+        const formattedDate = now.toLocaleDateString('en-GB') + ' ' + now.toLocaleTimeString('en-GB');
+
+        // ปรับให้เหมือนกับฟังก์ชัน renewService และ photo เพื่อความเสถียร
+        const response = await fetch(SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                sn: sn,
+                action: 'complete_pm',
+                pmStep: stepKey,
+                gps: gpsLink,
+                techName: techName,
+                logTime: formattedDate
+            }),
+            headers: { "Content-Type": "text/plain;charset=utf-8" } // ใช้ text/plain เลี่ยงปัญหา CORS Preflight (ไม่ต้องใช้ no-cors)
         });
+        const result = await response.json();
 
-        try {
-            // สร้างวันปัจจุบันในรูปแบบ ค.ศ.
-            const now = new Date();
-            const formattedDate = now.toLocaleDateString('en-GB') + ' ' + now.toLocaleTimeString('en-GB');
-
-            // ปรับให้เหมือนกับฟังก์ชัน renewService และ photo เพื่อความเสถียร
-            await fetch(SCRIPT_URL, {
-                method: 'POST',
-                mode: 'no-cors', // เพิ่มตรงนี้เพื่อกัน Error บน Google Sites
-                body: JSON.stringify({
-                    sn: sn,
-                    action: 'complete_pm',
-                    pmStep: stepKey,
-                    gps: "No GPS",
-                    logTime: formattedDate
-                })
-            });
-            Swal.fire({ icon: 'success', title: 'บันทึกสำเร็จ', timer: 1500, showConfirmButton: false });
-            loadData();
-        } catch (e) {
-            Swal.fire('Error', 'ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง', 'error');
-            box.checked = false;
+        if (result.status !== "success") {
+            throw new Error(result.message || "บันทึกไม่สำเร็จ");
         }
-    } else { box.checked = false; }
+
+        Swal.close();
+        Toast.fire({ icon: 'success', title: 'บันทึกสำเร็จ' });
+        loadData(true);
+    } catch (e) {
+        console.error("Complete PM error:", e);
+        Swal.fire('Error', e.message || 'ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง', 'error');
+        box.checked = false;
+    }
 }
 
 // ฟังก์ชันสำหรับเริ่มรอบบริการใหม่ (Renew)
@@ -295,22 +396,28 @@ async function renewService(sn) {
         Swal.fire({ title: 'กำลังบันทึก...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
         try {
-            await fetch(SCRIPT_URL, {
+            const response = await fetch(SCRIPT_URL, {
                 method: 'POST',
-                mode: 'no-cors', // สำคัญสำหรับ Google Sites
                 body: JSON.stringify({
                     sn: sn,
                     action: 'renew_service',
-                    startDate: startDate
-                })
+                    startDate: startDate,
+                    adminPassword: adminPasswordCache
+                }),
+                headers: { "Content-Type": "text/plain;charset=utf-8" }
             });
+            const result = await response.json();
 
-            setTimeout(() => {
-                Swal.fire({ icon: 'success', title: 'เริ่มรอบใหม่สำเร็จ', timer: 1500, showConfirmButton: false });
-                loadData();
-            }, 2000); // หน่วงเวลา 2 วินาที
+            if (result.status !== "success") {
+                throw new Error(result.message || "ไม่สามารถต่ออายุสัญญาได้");
+            }
+
+            Swal.close();
+            Toast.fire({ icon: 'success', title: 'เริ่มรอบใหม่สำเร็จ' });
+            loadData(true);
         } catch (e) {
-            Swal.fire('Error', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
+            console.error("Renew error:", e);
+            Swal.fire('Error', e.message || 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
         }
     }
 }
@@ -324,11 +431,16 @@ async function updateNote(sn, btn) {
     btn.innerHTML = '<i class="fas fa-circle-notch fa-spin-custom"></i> กำลังบันทึก...';
 
     try {
-        await fetch(SCRIPT_URL, {
+        const response = await fetch(SCRIPT_URL, {
             method: 'POST',
-            mode: 'no-cors',
-            body: JSON.stringify({ sn: sn, action: 'update_note', note: val })
+            body: JSON.stringify({ sn: sn, action: 'update_note', note: val }),
+            headers: { "Content-Type": "text/plain;charset=utf-8" }
         });
+        const result = await response.json();
+
+        if (result.status !== "success") {
+            throw new Error(result.message || "บันทึกไม่สำเร็จ");
+        }
 
         // ปรับการแจ้งเตือนกลับมาไว้กลางจอ
         await Swal.fire({
@@ -340,10 +452,11 @@ async function updateNote(sn, btn) {
         });
 
     } catch (e) {
+        console.error("Update note error:", e);
         Swal.fire({
             icon: 'error',
             title: 'เกิดข้อผิดพลาด',
-            text: 'ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง',
+            text: e.message || 'ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง',
             confirmButtonColor: '#d00000'
         });
     } finally {
@@ -353,79 +466,20 @@ async function updateNote(sn, btn) {
     }
 }
 
-async function uploadMultiplePhotos(sn, input) {
-    if (!input.files || input.files.length === 0) return;
-    const files = Array.from(input.files);
-
-    const btn = input.nextElementSibling;
-    const oldHtml = btn.innerHTML;
-    btn.disabled = true;
-
-    Swal.fire({
-        title: 'กำลังอัปโหลด...',
-        text: `เตรียมอัปโหลดทั้งหมด ${files.length} รูป`,
-        allowOutsideClick: false,
-        didOpen: () => Swal.showLoading()
-    });
-
-    let successCount = 0;
-    for (let i = 0; i < files.length; i++) {
-        try {
-            const imageData = await new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const img = new Image();
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        let w = img.width; let h = img.height;
-                        // ปรับความกว้างเป็น 1000px เพื่อลดขนาดไฟล์ให้ส่งผ่าน iframe ได้ง่ายขึ้น
-                        if (w > 1000) { h = h * (1000 / w); w = 1000; }
-                        canvas.width = w; canvas.height = h;
-                        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-                        resolve(canvas.toDataURL('image/jpeg', 0.8)); // ใช้ Quality 0.8 เพื่อความประหยัดเนื้อที่
-                    };
-                    img.src = e.target.result;
-                };
-                reader.readAsDataURL(files[i]);
-            });
-
-            // การส่ง fetch แบบปรับปรุงเพื่อ Google Sites
-            await fetch(SCRIPT_URL, {
-                method: 'POST',
-                mode: 'no-cors', // สำคัญ: ช่วยให้ข้ามข้อจำกัด CORS บน Google Sites ได้
-                body: JSON.stringify({
-                    sn: sn,
-                    action: 'photo',
-                    image: imageData,
-                    fileName: `IMG_${sn}_${Date.now()}_${i + 1}.jpg`
-                })
-            });
-
-            successCount++;
-            Swal.update({ text: `ส่งรูปที่ ${successCount} จาก ${files.length} แล้ว...` });
-        } catch (e) {
-            console.error("Upload error:", e);
-        }
-    }
-
-    Swal.fire({
-        icon: 'success',
-        title: 'ดำเนินการเสร็จสิ้น',
-        text: `ส่งข้อมูลรูปภาพ ${successCount} รูปเรียบร้อย`,
-        timer: 2000,
-        showConfirmButton: false
-    });
-
-    btn.disabled = false;
-    btn.innerHTML = oldHtml;
-    input.value = '';
+// --- ส่วนที่ปรับปรุงในฟังก์ชัน runFilters ---
+// หน่วงเวลา 250ms ก่อน filter จริง ลดภาระตอนพิมพ์เร็วๆ ในเครื่องที่มีข้อมูลเยอะ
+let filterDebounceTimer;
+function debouncedRunFilters() {
+    clearTimeout(filterDebounceTimer);
+    filterDebounceTimer = setTimeout(runFilters, 250);
 }
 
-// --- ส่วนที่ปรับปรุงในฟังก์ชัน runFilters ---
 function runFilters() {
     const q = document.getElementById('mainSearch').value.toLowerCase();
     const cards = document.querySelectorAll('.s-card');
     const isShowRenewOnly = document.getElementById('showRenewOnlySwitch').checked;
+    const typeFilterVal = document.getElementById('typeFilter').value;
+    const modeFilterVal = document.getElementById('modeFilter').value;
 
     let cO = 0, cU = 0;
 
@@ -446,7 +500,11 @@ function runFilters() {
         // *** ปรับเงื่อนไขตรงนี้เพื่อให้ Switch RENEW ทำงานร่วมกับ Filter อื่นได้ ***
         const matchRenew = !isShowRenewOnly || (isShowRenewOnly && isRenewCard);
 
-        if (matchSearch && matchMode && matchRenew) {
+        // ตัวกรอง Type (Lab/Real-time) และ Mode (Milled rice/Paddy)
+        const matchType = (typeFilterVal === 'all') || (card.getAttribute('data-type') === typeFilterVal);
+        const matchModeVal = (modeFilterVal === 'all') || (card.getAttribute('data-mode') === modeFilterVal);
+
+        if (matchSearch && matchMode && matchRenew && matchType && matchModeVal) {
             card.style.display = 'flex';
         } else {
             card.style.display = 'none';
@@ -465,6 +523,7 @@ function smartToggle(m) {
     runFilters();
 }
 
+loadFromCache();
 loadData();
 
 async function uploadPhotoByStep(sn, pmStep, input) {
@@ -487,23 +546,31 @@ async function uploadPhotoByStep(sn, pmStep, input) {
             // ปรับคุณภาพเหลือ 0.6 (ประหยัดพื้นที่และส่งไวขึ้น)
             const imageData = canvas.toDataURL('image/jpeg', 0.6);
 
-            await fetch(SCRIPT_URL, {
-                method: 'POST',
-                mode: 'no-cors', // โหมดนี้จะไม่ส่ง Error กลับมาที่หน้าเว็บ ทำให้ดูเหมือนบันทึกสำเร็จ
-                body: JSON.stringify({
-                    sn: sn,
-                    action: 'photo',
-                    pmStep: pmStep,
-                    image: imageData,
-                    fileName: `PM_IMG_${sn}_${pmStep}_${Date.now()}.jpg`
-                })
-            });
+            try {
+                const response = await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        sn: sn,
+                        action: 'photo',
+                        pmStep: pmStep,
+                        image: imageData,
+                        fileName: `PM_IMG_${sn}_${pmStep}_${Date.now()}.jpg`
+                    }),
+                    headers: { "Content-Type": "text/plain;charset=utf-8" }
+                });
+                const result = await response.json();
 
-            // หน่วงเวลาเพื่อให้แน่ใจว่าระบบหลังบ้านทำงานเสร็จ
-            setTimeout(() => {
-                Swal.fire({ icon: 'success', title: 'ส่งข้อมูลแล้ว', timer: 1500, showConfirmButton: false });
-                loadData();
-            }, 2000);
+                if (result.status !== "success") {
+                    throw new Error(result.message || "อัปโหลดไม่สำเร็จ");
+                }
+
+                Swal.close();
+                Toast.fire({ icon: 'success', title: 'อัปโหลดรูปสำเร็จ' });
+                loadData(true);
+            } catch (err) {
+                console.error("Upload photo by step error:", err);
+                Swal.fire({ icon: 'error', title: 'อัปโหลดไม่สำเร็จ', text: err.message || 'กรุณาลองใหม่อีกครั้ง' });
+            }
         };
         img.src = e.target.result;
     };
@@ -521,6 +588,12 @@ function clearAllFilters() {
     // 3. ปลด Checkbox 'COMPLETE'
     const hideCompleteSwitch = document.getElementById('hideCompleteSwitch');
     if (hideCompleteSwitch) hideCompleteSwitch.checked = false;
+
+    // 3.5 รีเซ็ต filter Type/Mode
+    const typeFilter = document.getElementById('typeFilter');
+    if (typeFilter) typeFilter.value = 'all';
+    const modeFilter = document.getElementById('modeFilter');
+    if (modeFilter) modeFilter.value = 'all';
 
     // 4. รีเซ็ตปุ่ม Filter ด้านบนให้กลับมาที่ 'ทั้งหมด'
     currentMode = 'all';

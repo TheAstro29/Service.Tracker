@@ -1,42 +1,343 @@
-/* เพิ่มสไตล์ปุ่ม Login แม่กุญแจ */
+/* =========================================================================================
+   C2TECH SERVICE TRACKER — DESIGN SYSTEM v2 (ธีมสีเดิม ออกแบบใหม่ทันสมัยขึ้น)
+========================================================================================= */
+
+:root {
+    /* --- สีหลัก (คงธีมเดิม) --- */
+    --primary: #1b4332;
+    --primary-light: #2d6a4f;
+    --secondary: #2d6a4f;
+    --secondary-light: #40916c;
+    --accent: #ffb703;
+    --accent-dark: #e09a00;
+    --bg: #f4f7f6;
+    --card-bg: #ffffff;
+    --danger: #e11d48;
+    --danger-bg: #fff1f2;
+    --warning: #fb8500;
+    --warning-bg: #fff7ed;
+    --success: #16a34a;
+    --success-bg: #f0fdf4;
+    --info: #4285F4;
+    --text-main: #0f172a;
+    --text-sub: #64748b;
+    --border: #e2e8f0;
+
+    /* --- Spacing Scale --- */
+    --sp-1: 4px;
+    --sp-2: 8px;
+    --sp-3: 12px;
+    --sp-4: 16px;
+    --sp-5: 20px;
+    --sp-6: 28px;
+
+    /* --- Radius Scale --- */
+    --r-sm: 10px;
+    --r-md: 14px;
+    --r-lg: 20px;
+    --r-full: 999px;
+
+    /* --- Shadow Scale --- */
+    --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06);
+    --shadow-md: 0 4px 14px rgba(15, 23, 42, 0.08);
+    --shadow-lg: 0 10px 30px rgba(15, 23, 42, 0.12);
+    --shadow-primary: 0 6px 16px rgba(27, 67, 50, 0.18);
+}
+
+* {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    font-family: 'Sarabun', sans-serif;
+    background-color: var(--bg);
+    margin: 0;
+    padding: 0;
+    color: var(--text-main);
+    line-height: 1.5;
+}
+
+/* =========================================================================================
+   HEADER / STICKY TOOLBAR
+========================================================================================= */
+.sticky-wrapper {
+    position: sticky;
+    top: 0;
+    background: linear-gradient(160deg, var(--primary) 0%, #123527 100%);
+    z-index: 1000;
+    padding: var(--sp-4) var(--sp-4) var(--sp-5);
+    box-shadow: var(--shadow-lg);
+    border-radius: 0 0 var(--r-lg) var(--r-lg);
+}
+
+.header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 1200px;
+    margin: 0 auto;
+    gap: var(--sp-3);
+}
+
+.brand h1 {
+    margin: 0;
+    font-size: 19px;
+    font-weight: 800;
+    color: #ffffff;
+    letter-spacing: -0.3px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.brand h1::before {
+    content: "";
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+}
+
+.brand h1 span {
+    font-weight: 500;
+    font-size: 10.5px;
+    color: rgba(255, 255, 255, 0.55);
+    display: block;
+    letter-spacing: 0.3px;
+    margin-top: 2px;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+}
+
 .admin-login-btn {
-    color: var(--accent);
-    font-size: 20px;
-    margin-right: 15px;
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 18px;
     cursor: pointer;
-    transition: 0.3s;
+    transition: 0.25s;
+    width: 38px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--r-full);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.admin-login-btn:hover {
+    background: rgba(255, 255, 255, 0.16);
 }
 
 .admin-login-btn.active {
-    color: #fff;
-    text-shadow: 0 0 10px var(--accent);
+    color: var(--primary);
+    background: var(--accent);
+    box-shadow: 0 0 14px rgba(255, 183, 3, 0.6);
 }
 
-.s-card[data-renew="true"] {
-    border: 2px solid var(--accent) !important;
-    background: linear-gradient(180deg, #fffcf5 0%, #ffffff 100%);
-}
-
-.status-badge {
-    position: absolute;
-    top: 10px;
-    right: 10px;
+.btn-refresh {
     background: var(--accent);
     color: var(--primary);
-    font-size: 10px;
+    border: none;
+    padding: 9px 16px;
+    border-radius: var(--r-full);
     font-weight: 800;
-    padding: 4px 10px;
-    border-radius: 20px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    z-index: 10;
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 3px 10px rgba(255, 183, 3, 0.35);
+    transition: 0.2s;
 }
 
-/* --- Custom Compact Switch สำหรับปุ่ม Complete --- */
+.btn-refresh:active {
+    transform: scale(0.96);
+}
+
+/* --- Filter Stat Chips --- */
+.filter-group {
+    display: flex;
+    gap: var(--sp-2);
+    max-width: 800px;
+    margin: var(--sp-4) auto 0 auto;
+}
+
+.f-card {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: var(--r-md);
+    padding: var(--sp-3) var(--sp-1);
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1.5px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.f-card:active {
+    transform: scale(0.96);
+}
+
+.f-card .val {
+    font-size: 22px;
+    font-weight: 800;
+    line-height: 1.2;
+    display: block;
+    color: #ffffff;
+}
+
+.f-card .lab {
+    font-size: 10.5px;
+    font-weight: 700;
+    margin-top: 2px;
+    color: rgba(255, 255, 255, 0.6);
+    letter-spacing: 0.2px;
+}
+
+/* สีเฉพาะของตัวเลขแต่ละ filter ตอนยังไม่ได้เลือก (ช่วยสื่อความหมายไว) */
+#f-overdue .val { color: #fda4af; }
+#f-urgent .val { color: #fdba74; }
+#f-all .val { color: #86efac; }
+
+.active-overdue {
+    background: var(--danger) !important;
+    border-color: var(--danger) !important;
+    box-shadow: 0 4px 14px rgba(225, 29, 72, 0.4);
+}
+
+.active-urgent {
+    background: var(--warning) !important;
+    border-color: var(--warning) !important;
+    box-shadow: 0 4px 14px rgba(251, 133, 0, 0.4);
+}
+
+.active-all {
+    background: var(--secondary-light) !important;
+    border-color: var(--secondary-light) !important;
+    box-shadow: 0 4px 14px rgba(64, 145, 108, 0.4);
+}
+
+.active-overdue .val, .active-overdue .lab,
+.active-urgent .val, .active-urgent .lab,
+.active-all .val, .active-all .lab {
+    color: white !important;
+}
+
+/* --- Search --- */
+.search-container {
+    max-width: 800px;
+    margin: var(--sp-3) auto 0 auto;
+}
+
+.search-box {
+    background: #ffffff;
+    border-radius: var(--r-full);
+    padding: 12px 18px;
+    display: flex;
+    align-items: center;
+    box-shadow: var(--shadow-md);
+    border: none;
+    transition: 0.2s;
+}
+
+.search-box:focus-within {
+    box-shadow: 0 0 0 3px rgba(255, 183, 3, 0.45), var(--shadow-md);
+}
+
+.search-box input {
+    border: none;
+    background: transparent;
+    width: 100%;
+    margin-left: 10px;
+    font-family: 'Sarabun';
+    font-size: 15px;
+    outline: none;
+    color: var(--text-main);
+}
+
+.search-box input::placeholder {
+    color: #a3adba;
+}
+
+/* --- Toolbar row (ล้างกรอง / Type / Mode / Renew / Done) --- */
+.toolbar-row {
+    display: flex;
+    gap: var(--sp-2);
+    align-items: center;
+    width: 100%;
+    max-width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.btn-clear {
+    padding: 0 14px;
+    border: none;
+    border-radius: var(--r-full);
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    height: 32px;
+    white-space: nowrap;
+}
+
+.btn-clear:hover {
+    background: rgba(255, 255, 255, 0.22);
+}
+
+.chip-select {
+    height: 32px;
+    border-radius: var(--r-full);
+    border: none;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--primary);
+    padding: 0 12px;
+    background: #ffffff;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+}
+
+.chip-switch {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 0 12px;
+    border-radius: var(--r-full);
+    height: 32px;
+}
+
+.chip-switch span.chip-label {
+    font-size: 10px;
+    font-weight: 800;
+    color: rgba(255, 255, 255, 0.75);
+    letter-spacing: 0.3px;
+}
+
+/* --- Compact Switch --- */
 .compact-switch {
     position: relative;
     display: inline-block;
-    width: 36px;
+    width: 34px;
     height: 18px;
+    flex-shrink: 0;
 }
 
 .compact-switch input {
@@ -48,11 +349,8 @@
 .compact-slider {
     position: absolute;
     cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: #cbd5e1;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: rgba(255, 255, 255, 0.25);
     transition: .3s;
     border-radius: 20px;
 }
@@ -70,516 +368,36 @@
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
-input:checked+.compact-slider {
-    background-color: var(--secondary);
+input:checked + .compact-slider {
+    background-color: var(--accent);
 }
 
-input:checked+.compact-slider:before {
-    transform: translateX(18px);
+input:checked + .compact-slider:before {
+    transform: translateX(16px);
 }
 
-.switch {
-    position: relative;
-    display: inline-block;
-    width: 44px;
-    height: 24px;
+#showRenewOnlySwitch:checked + .compact-slider {
+    background-color: var(--accent) !important;
 }
 
-.switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-}
-
-.slider {
-    position: absolute;
-    cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: #ccc;
-    transition: .4s;
-    border-radius: 34px;
-}
-
-.slider:before {
-    position: absolute;
-    content: "";
-    height: 18px;
-    width: 18px;
-    left: 3px;
-    bottom: 3px;
-    background-color: white;
-    transition: .4s;
-    border-radius: 50%;
-}
-
-input:checked+.slider {
-    background-color: var(--secondary);
-}
-
-input:checked+.slider:before {
-    transform: translateX(20px);
-}
-
-:root {
-    --primary: #1b4332;
-    --secondary: #2d6a4f;
-    --accent: #ffb703;
-    --bg: #f1f5f9;
-    --card-bg: #ffffff;
-    --danger: #d00000;
-    --warning: #fb8500;
-    --success: #38b000;
-    --text-main: #0f172a;
-    --text-sub: #64748b;
-}
-
-* {
-    box-sizing: border-box;
-    -webkit-tap-highlight-color: transparent;
-}
-
-body {
-    font-family: 'Sarabun', sans-serif;
-    background-color: var(--bg);
-    margin: 0;
-    padding: 0;
-    color: var(--text-main);
-}
-
-/* --- Header --- */
-.sticky-wrapper {
-    position: sticky;
-    top: 0;
-    background: var(--primary);
-    z-index: 1000;
-    padding: 15px 16px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-}
-
-.header-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    max-width: 1200px;
-    margin: 0 auto;
-}
-
-.brand h1 {
-    margin: 0;
-    font-size: 20px;
-    font-weight: 800;
-    color: #ffffff;
-    letter-spacing: -0.5px;
-}
-
-.brand h1 span {
-    font-weight: 400;
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.7);
-    display: block;
-}
-
-.btn-refresh {
-    background: var(--accent);
-    color: var(--primary);
-    border: none;
-    padding: 8px 16px;
-    border-radius: 12px;
-    font-weight: 800;
-    font-size: 13px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-/* --- ส่วนปุ่ม 3D แบบเรียงแถวเดียว --- */
-.filter-group {
-    display: flex;
-    gap: 10px;
-    /* ระยะห่างระหว่างปุ่ม */
-    max-width: 800px;
-    margin: 15px auto 0 auto;
-}
-
-.f-card {
-    flex: 1;
-    background: #f8fafc;
-    border-radius: 16px;
-    padding: 10px 5px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    border: none;
-    /* เงาสองชั้นสร้างมิติความหนา (3D) */
-    box-shadow: 0 5px 0 #cbd5e1, 0 8px 12px rgba(0, 0, 0, 0.15);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    top: 0;
-}
-
-/* เอฟเฟกต์ตอนกดปุ่มจะยุบลง */
-.f-card:active {
-    top: 3px;
-    box-shadow: 0 2px 0 #cbd5e1, 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.f-card .val {
-    font-size: 24px;
-    font-weight: 800;
-    line-height: 1.2;
-    display: block;
-}
-
-.f-card .lab {
-    font-size: 11px;
-    font-weight: 700;
-    margin-top: 2px;
-    color: #64748b;
-}
-
-/* --- สถานะ 3D Active (เมื่อปุ่มถูกเลือก) --- */
-
-/* เลยกำหนด - สีแดง */
-.active-overdue {
-    background: #e11d48 !important;
-    box-shadow: 0 3px 0 #9f1239 !important;
-    top: 2px;
-}
-
-.active-overdue .val,
-.active-overdue .lab {
-    color: white !important;
-}
-
-/* ใกล้กำหนด - สีส้ม */
-.active-urgent {
-    background: #fb8500 !important;
-    box-shadow: 0 3px 0 #d97706 !important;
-    top: 2px;
-}
-
-.active-urgent .val,
-.active-urgent .lab {
-    color: white !important;
-}
-
-/* ทั้งหมด - สีเขียว */
-.active-all {
-    background: #22c55e !important;
-    box-shadow: 0 3px 0 #16a34a !important;
-    top: 2px;
-}
-
-.active-all .val,
-.active-all .lab {
-    color: white !important;
-}
-
-/* สีพาสเทลสำหรับสถานะปกติ (Inactive) */
-#f-overdue {
-    background-color: #fff1f2;
-}
-
-/* พาสเทลแดงอ่อน */
-#f-urgent {
-    background-color: #fffbeb;
-}
-
-/* พาสเทลเหลืองอ่อน */
-#f-all {
-    background-color: #f0fdf4;
-}
-
-/* พาสเทลเขียวอ่อน */
-
-.f-card .val {
-    font-size: 26px;
-    font-weight: 800;
-    line-height: 1.2;
-    display: block;
-}
-
-.f-card .lab {
-    font-size: 11px;
-    font-weight: 700;
-    margin-top: 2px;
-}
-
-.search-container {
-    max-width: 800px;
-    margin: 12px auto 0 auto;
-}
-
-.search-box {
-    background: #ffffff;
-    border-radius: 12px;
-    padding: 10px 15px;
-    display: flex;
-    align-items: center;
-    border: 2px solid #e2e8f0;
-}
-
-.search-box input {
-    border: none;
-    background: transparent;
-    width: 100%;
-    margin-left: 10px;
-    font-family: 'Sarabun';
-    font-size: 16px;
-    outline: none;
-}
-
-/* --- Card & Accordion --- */
-.container {
-    padding: 15px;
-    max-width: 1200px;
-    margin: 0 auto;
-}
-
-#serviceList {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 15px;
-}
-
-@media (min-width: 768px) {
-    #serviceList {
-        grid-template-columns: repeat(3, 1fr);
-    }
-}
-
-.s-card {
-    background: white;
-    border-radius: 22px;
-    padding: 18px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-    border: 1px solid #e2e8f0;
-    display: flex;
-    flex-direction: column;
-    position: relative;
-}
-
-/* --- Card Pastel Highlights --- */
-.s-card.card-overdue {
-    background-color: #fff1f2 !important;
-    /* Pastel Red */
-    border: 1px solid #fecdd3 !important;
-}
-
-.s-card.card-urgent {
-    background-color: #fffbeb !important;
-    /* Pastel Yellow */
-    border: 1px solid #fef3c7 !important;
-}
-
-
-.client-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.client-info {
-    flex-grow: 1;
-    cursor: pointer;
-}
-
-.client-name {
-    font-size: 17px;
-    font-weight: 800;
-    color: var(--primary);
-}
-
-.client-loc {
-    font-size: 12px;
-    color: var(--text-sub);
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.btn-nav {
-    background: #4285F4;
-    color: white;
-    width: 42px;
-    height: 42px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-decoration: none;
-}
-
-.toggle-btn {
-    background: #f8fafc;
-    color: var(--text-sub);
-    border: 1px solid #e2e8f0;
-    width: 100%;
-    padding: 8px;
-    border-radius: 10px;
-    margin-top: 12px;
-    font-size: 11px;
-    font-weight: 700;
-    cursor: pointer;
-}
-
-/* Detail Panel */
-.detail-mode {
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.3s ease-out;
-}
-
-.detail-mode.show {
-    max-height: 1200px;
-    margin-top: 15px;
-    padding-top: 10px;
-    border-top: 1px dashed #e2e8f0;
-}
-
-.device-info {
-    background: #f1f5f9;
-    border-radius: 12px;
-    padding: 12px;
-    margin-bottom: 15px;
-    font-size: 12px;
-}
-
-.info-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 4px 0;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-}
-
-.info-row:last-child {
-    border: none;
-}
-
-.info-label {
-    font-weight: 800;
-    color: #64748b;
-    text-transform: uppercase;
-}
-
-.info-val {
-    font-weight: 700;
-    color: #0f172a;
-}
-
-.pm-steps {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.pm-step {
-    background: #ffffff;
-    border-radius: 12px;
-    padding: 10px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    border: 1px solid #f1f5f9;
-}
-
-.pm-step.done {
-    border-color: var(--success);
-    background: #f7fee7;
-}
-
-.pm-step.overdue {
-    border-left: 5px solid var(--danger);
-    background: #fff1f2;
-}
-
-.pm-step.urgent {
-    border-left: 5px solid var(--warning);
-    background: #fff7ed;
-}
-
-textarea {
-    width: 100%;
-    border-radius: 12px;
-    border: 1.5px solid #e2e8f0;
-    padding: 12px;
-    font-family: 'Sarabun';
-    font-size: 14px;
-    margin-top: 15px;
-    resize: none;
-}
-
-.action-group {
-    display: flex;
-    gap: 8px;
-    margin-top: 12px;
-}
-
-.btn-save {
-    background: var(--primary);
-    color: white;
-    border: none;
-    padding: 14px;
-    border-radius: 12px;
-    font-weight: 800;
-    flex: 2;
-    cursor: pointer;
-}
-
-.btn-photo {
-    background: #475569;
-    color: white;
-    border: none;
-    padding: 14px;
-    border-radius: 12px;
-    flex: 1;
-    cursor: pointer;
-    text-align: center;
-}
-
-/* ปรับปุ่มบันทึกให้ดูทันสมัยขึ้น */
-.btn-save {
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-}
-
-.btn-save:disabled {
-    background: #94a3b8;
-    cursor: not-allowed;
-}
-
-/* ==========================================================================
-   หน้า Loading Screen ออกแบบระดับพรีเมียม (Full Screen Overlay with Animations)
-   ========================================================================== */
+/* =========================================================================================
+   LOADING SCREEN
+========================================================================================= */
 .loader-main {
     position: fixed !important;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: rgba(15, 23, 42, 0.93); /* พื้นหลังสีเข้มหรูหราสไตล์ Dashboard */
-    backdrop-filter: blur(10px); /* เอฟเฟกต์กระจกฝ้าหน้าจอเบลอหลัง */
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    background: rgba(15, 23, 42, 0.94);
+    backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
-    z-index: 99999 !important; /* แสดงผลอยู่เหนือทุก Element บนหน้าจอ */
+    z-index: 99999 !important;
     text-align: center;
-    margin: 0;
-    padding: 0;
+    margin: 0; padding: 0;
 }
 
 .loader-container {
     position: absolute;
-    top: 50%;
-    left: 50%;
+    top: 50%; left: 50%;
     transform: translate(-50%, -50%);
     display: flex;
     flex-direction: column;
@@ -589,11 +407,9 @@ textarea {
     max-width: 320px;
 }
 
-/* ชุดวงแหวนสไตล์เทคโนโลยี */
 .custom-tech-loader {
     position: relative;
-    width: 100px;
-    height: 100px;
+    width: 100px; height: 100px;
     margin-bottom: 25px;
 }
 
@@ -603,27 +419,23 @@ textarea {
     border: 4px solid transparent;
 }
 
-/* วงแหวนนอกสีทองแบรนด์ หมุนตามเข็ม */
 .ring-outer {
     top: 0; left: 0; right: 0; bottom: 0;
-    border-top-color: var(--accent); 
+    border-top-color: var(--accent);
     border-bottom-color: var(--accent);
     animation: spinClockwise 2s linear infinite;
 }
 
-/* วงแหวนในสีเขียวแบรนด์ หมุนทวนเข็ม */
 .ring-inner {
     top: 12px; left: 12px; right: 12px; bottom: 12px;
-    border-left-color: var(--secondary); 
-    border-right-color: var(--secondary);
+    border-left-color: var(--secondary-light);
+    border-right-color: var(--secondary-light);
     animation: spinCounterClockwise 1.3s linear infinite;
 }
 
-/* ไอคอนตรงกลาง */
 .loader-center-icon {
     position: absolute;
-    top: 50%;
-    left: 50%;
+    top: 50%; left: 50%;
     transform: translate(-50%, -50%);
     color: #ffffff;
     font-size: 24px;
@@ -634,33 +446,27 @@ textarea {
 }
 
 .loader-text {
-    font-size: 13px !important;       /* ลดขนาดลงเล็กน้อยเพื่อให้สมดุลกับชื่อแอป */
-    font-weight: 400;                 /* ใช้ตัวบางลง */
-    color: rgba(255, 255, 255, 0.7);  /* เปลี่ยนเป็นสีขาวนวลแบบโปร่งแสงเล็กน้อย */
+    font-size: 13px !important;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.7);
     margin-top: 10px;
     letter-spacing: 1px;
-    /* คงแอนิเมชันกระพริบ (Breathing) ไว้เช่นเดิม */
-    animation: pulseText 1.5s infinite alternate ease-in-out; 
+    animation: pulseText 1.5s infinite alternate ease-in-out;
 }
 
 .loader-subtext {
-    font-size: 24px !important;       /* ขยายขนาดให้ใหญ่ขึ้นอย่างเด่นชัด (จากเดิม 11px) */
-    font-weight: 800;                 /* ความหนาตัวอักษรสูงสุด */
-    color: var(--accent);             /* ใช้สีเหลืองทองประจำแบรนด์ C2TECH */
+    font-size: 22px !important;
+    font-weight: 800;
+    color: var(--accent);
     margin-top: 12px;
-    letter-spacing: 3px;              /* เพิ่มระยะห่างระหว่างตัวอักษรเพิ่มความโมเดิร์นและอ่านง่าย */
-    opacity: 1 !important;            /* ปรับความเข้มเต็ม 100% ไม่ให้จาง */
-    text-transform: uppercase;         /* บังคับเป็นตัวพิมพ์ใหญ่ทั้งหมด */
-    
-    /* เอฟเฟกต์เติมแสงนีออนเรืองรอง (Glow Effect) ทำให้ชื่อแอปดูมีมิติและเท่ขึ้นมาก */
-    text-shadow: 0 0 15px rgba(255, 183, 3, 0.6), 
-                 0 0 30px rgba(255, 183, 3, 0.3); 
+    letter-spacing: 2.5px;
+    opacity: 1 !important;
+    text-transform: uppercase;
+    text-shadow: 0 0 15px rgba(255, 183, 3, 0.6), 0 0 30px rgba(255, 183, 3, 0.3);
 }
 
-/* แถบหลอดแก้วแสดงความก้าวหน้า (Progress Bar Animation) */
 .loader-bar-wrapper {
-    width: 150px;
-    height: 4px;
+    width: 150px; height: 4px;
     background: rgba(255, 255, 255, 0.1);
     border-radius: 10px;
     margin-top: 22px;
@@ -669,71 +475,328 @@ textarea {
 }
 
 .loader-progress-bar {
-    width: 60px;
-    height: 100%;
-    background: linear-gradient(90deg, var(--secondary), var(--accent));
+    width: 60px; height: 100%;
+    background: linear-gradient(90deg, var(--secondary-light), var(--accent));
     border-radius: 10px;
     position: absolute;
     animation: loadingBarMove 1.8s infinite ease-in-out;
 }
 
-/* --- บล็อกสร้าง Animation Keyframes --- */
-@keyframes spinClockwise {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+@keyframes spinClockwise { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+@keyframes spinCounterClockwise { 0% { transform: rotate(0deg); } 100% { transform: rotate(-360deg); } }
+@keyframes pulseText { 0% { opacity: 0.5; transform: scale(0.97); } 100% { opacity: 1; transform: scale(1.02); } }
+@keyframes loadingBarMove { 0% { left: -60px; } 50% { left: 150px; } 100% { left: -60px; } }
+
+/* =========================================================================================
+   CARD LIST
+========================================================================================= */
+.container {
+    padding: var(--sp-4);
+    max-width: 1280px;
+    margin: 0 auto;
 }
 
-@keyframes spinCounterClockwise {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(-360deg); }
+#serviceList {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--sp-4);
 }
 
-@keyframes pulseText {
-    0% { opacity: 0.5; transform: scale(0.97); }
-    100% { opacity: 1; transform: scale(1.02); }
+@media (min-width: 720px) {
+    #serviceList { grid-template-columns: repeat(2, 1fr); }
 }
 
-@keyframes loadingBarMove {
-    0% { left: -60px; }
-    50% { left: 150px; }
-    100% { left: -60px; }
+@media (min-width: 1100px) {
+    #serviceList { grid-template-columns: repeat(3, 1fr); }
 }
 
-#showRenewOnlySwitch:checked+.compact-slider {
-    background-color: var(--accent) !important;
+@media (min-width: 1500px) {
+    #serviceList { grid-template-columns: repeat(4, 1fr); }
 }
 
-.btn-clear {
-    padding: 8px 15px;
-    border: none;
-    border-radius: 12px;
-    background: #6c757d;
-    color: white;
-    font-size: 14px;
+.s-card {
+    background: var(--card-bg);
+    border-radius: var(--r-lg);
+    padding: var(--sp-4);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.s-card:hover {
+    box-shadow: var(--shadow-md);
+}
+
+.s-card.card-overdue {
+    background: linear-gradient(180deg, var(--danger-bg) 0%, #ffffff 55%);
+    border-color: #fecdd3;
+}
+
+.s-card.card-urgent {
+    background: linear-gradient(180deg, var(--warning-bg) 0%, #ffffff 55%);
+    border-color: #fde9d0;
+}
+
+.s-card[data-renew="true"] {
+    border: 2px solid var(--accent) !important;
+    background: linear-gradient(180deg, #fffcf2 0%, #ffffff 60%);
+}
+
+.status-badge {
+    position: absolute;
+    top: -10px;
+    right: 14px;
+    background: var(--accent);
+    color: var(--primary);
+    font-size: 10px;
+    font-weight: 800;
+    padding: 5px 12px;
+    border-radius: var(--r-full);
+    box-shadow: 0 3px 8px rgba(255, 183, 3, 0.45);
+    z-index: 10;
+    letter-spacing: 0.2px;
+}
+
+/* --- Client Header (avatar + name) --- */
+.client-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.client-info {
+    flex-grow: 1;
     cursor: pointer;
-    transition: 0.3s;
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--sp-3);
 }
 
-.btn-clear:hover {
-    background: #5a6268;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+.client-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--r-md);
+    background: linear-gradient(160deg, var(--primary), var(--secondary-light));
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+    box-shadow: var(--shadow-primary);
 }
 
-/* Animation สำหรับไอคอนหมุนวน */
-@keyframes spin {
-    from {
-        transform: rotate(0deg);
-    }
-
-    to {
-        transform: rotate(360deg);
-    }
+.client-name {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--primary);
+    line-height: 1.3;
 }
 
-.fa-spin-custom {
-    animation: spin 1s linear infinite;
-    display: inline-block;
+.client-loc {
+    font-size: 11.5px;
+    color: var(--text-sub);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 2px;
+    flex-wrap: wrap;
+}
+
+/* --- Toggle detail button --- */
+.toggle-btn {
+    background: var(--bg);
+    color: var(--text-sub);
+    border: 1px solid var(--border);
+    width: 100%;
+    padding: 10px;
+    border-radius: var(--r-sm);
+    margin-top: var(--sp-3);
+    font-size: 11.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.toggle-btn:hover {
+    background: #eef2f0;
+}
+
+.toggle-btn i {
+    transition: transform 0.25s ease;
+}
+
+/* --- Detail Panel --- */
+.detail-mode {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.35s ease-out;
+}
+
+.detail-mode.show {
+    max-height: 1400px;
+    margin-top: var(--sp-4);
+    padding-top: var(--sp-3);
+    border-top: 1px dashed var(--border);
+}
+
+.device-info {
+    background: var(--bg);
+    border-radius: var(--r-md);
+    padding: var(--sp-3);
+    margin-bottom: var(--sp-4);
+    font-size: 12.5px;
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 2px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.info-row:last-child { border: none; }
+
+.info-label {
+    font-weight: 800;
+    color: #94a3b8;
+    text-transform: uppercase;
+    font-size: 10.5px;
+    letter-spacing: 0.3px;
+    align-self: center;
+}
+
+.info-val {
+    font-weight: 700;
+    color: var(--text-main);
+    text-align: right;
+}
+
+/* --- PM Steps (Checklist Timeline) --- */
+.pm-steps {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+}
+
+.pm-step {
+    background: #ffffff;
+    border-radius: var(--r-md);
+    padding: var(--sp-3);
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-3);
+    border: 1px solid var(--border);
+    transition: 0.2s;
+}
+
+.pm-step input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+    accent-color: var(--success);
+    flex-shrink: 0;
+    margin-top: 2px;
+    cursor: pointer;
+}
+
+.pm-step.done {
+    border-color: #bbf7d0;
+    background: var(--success-bg);
+}
+
+.pm-step.overdue {
+    border-left: 4px solid var(--danger);
+    background: var(--danger-bg);
+}
+
+.pm-step.urgent {
+    border-left: 4px solid var(--warning);
+    background: var(--warning-bg);
+}
+
+.pm-step.locked {
+    opacity: 0.55;
+    background: #f8fafc;
+}
+
+.pm-step.locked input[type="checkbox"] {
+    cursor: not-allowed;
+    accent-color: #94a3b8;
+}
+
+.step-info { flex: 1; min-width: 0; }
+
+/* --- Note / Actions --- */
+textarea {
+    width: 100%;
+    border-radius: var(--r-md);
+    border: 1.5px solid var(--border);
+    padding: 12px;
+    font-family: 'Sarabun';
+    font-size: 14px;
+    margin-top: var(--sp-4);
+    resize: none;
+    transition: 0.2s;
+    background: var(--bg);
+}
+
+textarea:focus {
+    outline: none;
+    border-color: var(--secondary-light);
+    background: #fff;
+}
+
+.action-group {
+    display: flex;
+    gap: var(--sp-2);
+    margin-top: var(--sp-3);
+}
+
+.btn-save {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 13px;
+    border-radius: var(--r-md);
+    font-weight: 800;
+    flex: 2;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 13.5px;
+}
+
+.btn-save:hover { box-shadow: var(--shadow-primary); }
+.btn-save:active { transform: scale(0.98); }
+
+.btn-save:disabled {
+    background: #94a3b8;
+    cursor: not-allowed;
+}
+
+.btn-photo {
+    background: #475569;
+    color: white;
+    border: none;
+    padding: 14px;
+    border-radius: var(--r-md);
+    flex: 1;
+    cursor: pointer;
+    text-align: center;
+}
+
+/* --- Responsive polish for very small phones --- */
+@media (max-width: 400px) {
+    .brand h1 { font-size: 16px; }
+    .toolbar-row { gap: 6px; }
 }
