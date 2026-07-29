@@ -364,13 +364,36 @@ async function handleCheck(box, sn, stepKey) {
     const techName = confirm.value;
     if (techName) localStorage.setItem('tech_name', techName); // จำชื่อไว้ ไม่ต้องพิมพ์ซ้ำครั้งหน้า
 
-    Swal.fire({
-        title: 'กำลังตรวจสอบตำแหน่ง GPS...',
-        allowOutsideClick: false,
-        didOpen: () => Swal.showLoading()
-    });
+    // บังคับให้ต้องได้ตำแหน่ง GPS จริงก่อนถึงจะบันทึกปิดงานได้ — วนลองใหม่ได้ไม่จำกัดครั้ง หรือกดยกเลิกออกได้ทุกเมื่อ
+    let gpsResult = null;
+    while (true) {
+        Swal.fire({
+            title: 'กำลังตรวจสอบตำแหน่ง GPS...',
+            allowOutsideClick: false,
+            didOpen: () => Swal.showLoading()
+        });
 
-    const gpsResult = await getGpsLink();
+        gpsResult = await getGpsLink();
+
+        if (!gpsResult.reason) break; // ได้ตำแหน่งสำเร็จ ออกจาก loop ไปบันทึกต่อได้
+
+        const retry = await Swal.fire({
+            icon: 'error',
+            title: 'ไม่สามารถระบุตำแหน่ง GPS ได้',
+            html: `${escapeHtml(gpsResult.reason)}<br><br><b>ระบบกำหนดให้ต้องมีตำแหน่ง GPS จึงจะบันทึกปิดงานได้</b>`,
+            showCancelButton: true,
+            confirmButtonText: 'ลองอีกครั้ง',
+            confirmButtonColor: '#1b4332',
+            cancelButtonText: 'ยกเลิก'
+        });
+
+        if (!retry.isConfirmed) {
+            box.checked = false;
+            return; // ผู้ใช้เลือกยกเลิก ไม่บันทึกอะไรเลย
+        }
+        // เลือก "ลองอีกครั้ง" -> วน loop กลับไปขอ GPS ใหม่
+    }
+
     Swal.update({ title: 'กำลังบันทึก...' });
 
     try {
@@ -398,18 +421,7 @@ async function handleCheck(box, sn, stepKey) {
         }
 
         Swal.close();
-        if (gpsResult.reason) {
-            // แจ้งเตือนแบบ Swal (ไม่ใช่ Toast) เพราะเป็นข้อมูลสำคัญที่อยากให้ผู้ใช้เห็นแน่ๆ ไม่อยากให้หายไปเงียบๆเหมือนเดิม
-            await Swal.fire({
-                icon: 'warning',
-                title: 'บันทึกสำเร็จ แต่ไม่ได้บันทึกตำแหน่ง GPS',
-                text: gpsResult.reason,
-                confirmButtonText: 'รับทราบ',
-                confirmButtonColor: '#1b4332'
-            });
-        } else {
-            Toast.fire({ icon: 'success', title: 'บันทึกสำเร็จ (พร้อม GPS)' });
-        }
+        Toast.fire({ icon: 'success', title: 'บันทึกสำเร็จ (พร้อม GPS)' });
         loadData(true);
     } catch (e) {
         console.error("Complete PM error:", e);
