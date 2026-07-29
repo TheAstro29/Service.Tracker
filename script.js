@@ -303,14 +303,38 @@ function toggleDetail(sn) {
 }
 
 // ดึงพิกัด GPS จริงจากเบราว์เซอร์ แปลงเป็นลิงก์ Google Maps ให้กดดูตำแหน่งได้ทันที
-// ถ้าเบราว์เซอร์ไม่รองรับ หรือผู้ใช้ไม่อนุญาต จะคืนค่า 'No GPS' แทน (ไม่ทำให้การบันทึกล้มเหลว)
+// คืนค่าเป็น { link, reason } — reason จะเป็น null ถ้าสำเร็จ หรือมีข้อความอธิบายถ้าล้มเหลว (ไม่ใช่แค่ 'No GPS' เงียบๆแบบเดิม)
+// กลยุทธ์: ลองแบบ high-accuracy (GPS ดาวเทียม) ก่อน ถ้า timeout/ล้มเหลว จะลองซ้ำแบบ low-accuracy (Wi-Fi/เครือข่าย เร็วกว่า)
+// เพราะบนมือถือ Android การหา GPS ครั้งแรกในตึก/โรงงานมักใช้เวลานาน ทำให้ timeout สั้นเกินไปแบบเดิมพลาดบ่อย
 function getGpsLink() {
     return new Promise((resolve) => {
-        if (!navigator.geolocation) return resolve('No GPS');
+        if (!navigator.geolocation) {
+            resolve({ link: 'No GPS', reason: 'เบราว์เซอร์นี้ไม่รองรับการระบุตำแหน่ง (GPS)' });
+            return;
+        }
+
+        const describeError = (err) => {
+            if (err.code === 1) return 'ไม่ได้รับอนุญาตสิทธิ์เข้าถึงตำแหน่ง — กรุณาเปิดสิทธิ์ Location ให้เว็บนี้ในตั้งค่าเบราว์เซอร์';
+            if (err.code === 2) return 'หาตำแหน่งไม่ได้ (สัญญาณ GPS ไม่พอ ลองออกไปที่โล่งๆ หรือเปิด Wi-Fi/เครือข่ายมือถือไว้)';
+            if (err.code === 3) return 'หาตำแหน่งช้าเกินไป (timeout)';
+            return 'ไม่สามารถระบุตำแหน่งได้';
+        };
+
+        const tryLowAccuracy = (firstErr) => {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => resolve({ link: `https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`, reason: null }),
+                (err2) => resolve({ link: 'No GPS', reason: describeError(firstErr || err2) }),
+                { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+            );
+        };
+
         navigator.geolocation.getCurrentPosition(
-            (pos) => resolve(`https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`),
-            () => resolve('No GPS'), // ผู้ใช้กด Deny หรือหาตำแหน่งไม่ได้
-            { enableHighAccuracy: true, timeout: 6000, maximumAge: 60000 }
+            (pos) => resolve({ link: `https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`, reason: null }),
+            (err) => {
+                if (err.code === 1) { resolve({ link: 'No GPS', reason: describeError(err) }); return; } // Deny แล้วไม่ต้องลองซ้ำ (ไม่มีประโยชน์)
+                tryLowAccuracy(err); // timeout/หาไม่เจอ -> ลองซ้ำแบบเร็วกว่า
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
         );
     });
 }
@@ -346,7 +370,7 @@ async function handleCheck(box, sn, stepKey) {
         didOpen: () => Swal.showLoading()
     });
 
-    const gpsLink = await getGpsLink();
+    const gpsResult = await getGpsLink();
     Swal.update({ title: 'กำลังบันทึก...' });
 
     try {
@@ -361,7 +385,7 @@ async function handleCheck(box, sn, stepKey) {
                 sn: sn,
                 action: 'complete_pm',
                 pmStep: stepKey,
-                gps: gpsLink,
+                gps: gpsResult.link,
                 techName: techName,
                 logTime: formattedDate
             }),
@@ -374,7 +398,18 @@ async function handleCheck(box, sn, stepKey) {
         }
 
         Swal.close();
-        Toast.fire({ icon: 'success', title: 'บันทึกสำเร็จ' });
+        if (gpsResult.reason) {
+            // แจ้งเตือนแบบ Swal (ไม่ใช่ Toast) เพราะเป็นข้อมูลสำคัญที่อยากให้ผู้ใช้เห็นแน่ๆ ไม่อยากให้หายไปเงียบๆเหมือนเดิม
+            await Swal.fire({
+                icon: 'warning',
+                title: 'บันทึกสำเร็จ แต่ไม่ได้บันทึกตำแหน่ง GPS',
+                text: gpsResult.reason,
+                confirmButtonText: 'รับทราบ',
+                confirmButtonColor: '#1b4332'
+            });
+        } else {
+            Toast.fire({ icon: 'success', title: 'บันทึกสำเร็จ (พร้อม GPS)' });
+        }
         loadData(true);
     } catch (e) {
         console.error("Complete PM error:", e);
