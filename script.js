@@ -28,6 +28,7 @@ async function adminAuth() {
         document.getElementById('userMgmtIcon').style.display = 'none';
         document.getElementById('dashboardIcon').style.display = 'none';
         document.getElementById('dataValidationIcon').style.display = 'none';
+        document.getElementById('reportIcon').style.display = 'none';
         Swal.fire({ icon: 'info', title: 'ออกจากระบบ Admin', timer: 1000, showConfirmButton: false });
         render();
         return;
@@ -52,6 +53,7 @@ async function adminAuth() {
         document.getElementById('userMgmtIcon').style.display = 'inline-flex';
         document.getElementById('dashboardIcon').style.display = 'inline-flex';
         document.getElementById('dataValidationIcon').style.display = 'inline-flex';
+        document.getElementById('reportIcon').style.display = 'inline-flex';
         Swal.fire({ icon: 'success', title: 'ยินดีต้อนรับ Admin', timer: 1000, showConfirmButton: false });
         render();
     } else if (password) {
@@ -457,7 +459,7 @@ async function handleCheck(box, sn, stepKey) {
     try {
         // สร้างวันปัจจุบันในรูปแบบ ค.ศ.
         const now = new Date();
-        const formattedDate = now.toLocaleDateString('en-GB') + ' ' + now.toLocaleTimeString('en-GB');
+        const formattedDate = now.toISOString(); // ใช้ ISO 8601 กันความกำกวมเรื่อง DD/MM vs MM/DD ตาม locale ของสเปรดชีต
 
         // ปรับให้เหมือนกับฟังก์ชัน renewService และ photo เพื่อความเสถียร
         const response = await fetch(SCRIPT_URL, {
@@ -1197,6 +1199,235 @@ async function setupDataValidationUI() {
     } catch (e) {
         Swal.fire('Error', e.message || 'ตั้งค่าไม่สำเร็จ', 'error');
     }
+}
+
+/* =========================================================================================
+   Admin: ระบบ Report สรุปผล Service Tracker (PDF สำหรับพิมพ์ + รูปภาพสำหรับ LINE)
+========================================================================================= */
+
+function formatThaiDate(isoOrDateStr) {
+    const d = new Date(isoOrDateStr);
+    if (isNaN(d.getTime())) return '-';
+    return d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+async function openReportModal() {
+    if (!isAdmin) { Swal.fire({ icon: 'warning', title: 'สิทธิ์ไม่เพียงพอ', text: 'กรุณาล็อกอินเป็น Admin ก่อน' }); return; }
+
+    const today = new Date().toISOString().split('T')[0];
+    const firstOfMonth = new Date();
+    firstOfMonth.setDate(1);
+    const firstOfMonthStr = firstOfMonth.toISOString().split('T')[0];
+
+    function validateReportDates() {
+        const start = document.getElementById('report-start').value;
+        const end = document.getElementById('report-end').value;
+        if (!start || !end) { Swal.showValidationMessage('กรุณาเลือกช่วงวันที่ให้ครบ'); return false; }
+        if (start > end) { Swal.showValidationMessage('วันเริ่มต้นต้องมาก่อนวันสิ้นสุด'); return false; }
+        return { start, end };
+    }
+
+    const result = await Swal.fire({
+        title: '<i class="fas fa-file-lines" style="color:#1b4332;"></i> สร้างรายงานสรุป',
+        html: `
+            <div style="text-align:left;">
+                <label style="font-size:12px; font-weight:700;">ช่วงวันที่เริ่มต้น</label>
+                <input type="date" id="report-start" class="swal2-input" style="width:100%; height:38px; margin:4px 0 12px;" value="${firstOfMonthStr}">
+                <label style="font-size:12px; font-weight:700;">ช่วงวันที่สิ้นสุด</label>
+                <input type="date" id="report-end" class="swal2-input" style="width:100%; height:38px; margin:4px 0;" value="${today}">
+            </div>
+        `,
+        showCancelButton: true,
+        showDenyButton: true,
+        confirmButtonText: '<i class="fas fa-file-pdf"></i> PDF สำหรับพิมพ์',
+        denyButtonText: '<i class="fas fa-image"></i> รูปสำหรับ LINE',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#1b4332',
+        denyButtonColor: '#00b900',
+        preConfirm: validateReportDates,
+        preDeny: validateReportDates
+    });
+
+    if (result.isConfirmed) {
+        await generateReport(result.value.start, result.value.end, 'pdf');
+    } else if (result.isDenied) {
+        await generateReport(result.value.start, result.value.end, 'image');
+    }
+}
+
+async function generateReport(start, end, format) {
+    Swal.fire({ title: 'กำลังรวบรวมข้อมูล...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+    try {
+        const res = await fetch(SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'service_report_data', adminPassword: adminPasswordCache, startDate: start, endDate: end }),
+            headers: { "Content-Type": "text/plain;charset=utf-8" }
+        });
+        const data = await res.json();
+        if (data.status !== 'success') throw new Error(data.message);
+        if (data.report.error) throw new Error(data.report.error);
+
+        Swal.close();
+
+        if (format === 'pdf') {
+            renderPdfReport(data.report);
+        } else {
+            renderLineImageReport(data.report);
+        }
+    } catch (e) {
+        Swal.fire('Error', e.message || 'สร้างรายงานไม่สำเร็จ', 'error');
+    }
+}
+
+// --- แบบที่ 1: PDF สำหรับพิมพ์เสนอเจ้านาย (ใช้ browser print + CSS @media print) ---
+function renderPdfReport(report) {
+    const totalOverdue = report.overdueList.length;
+    const totalUrgent = report.urgentList.length;
+    const totalCompleted = report.completedList.length;
+
+    const rowsCompleted = report.completedList.map(r => `
+        <tr>
+            <td>${formatThaiDate(r.completedDate)}</td>
+            <td>${escapeHtml(r.sn)}</td>
+            <td>${escapeHtml(r.client)}</td>
+            <td>${escapeHtml(r.step)}</td>
+            <td>${escapeHtml(r.tech)}</td>
+        </tr>
+    `).join('') || `<tr><td colspan="5" style="text-align:center; color:#999;">ไม่มีข้อมูลในช่วงนี้</td></tr>`;
+
+    const rowsOverdue = report.overdueList.map(r => `
+        <tr>
+            <td>${escapeHtml(r.sn)}</td>
+            <td>${escapeHtml(r.client)}</td>
+            <td>${escapeHtml(r.location)}</td>
+            <td>${escapeHtml(r.step)}</td>
+            <td>${formatThaiDate(r.plannedDate)}</td>
+        </tr>
+    `).join('') || `<tr><td colspan="5" style="text-align:center; color:#999;">ไม่มีเครื่องเลยกำหนด</td></tr>`;
+
+    const container = document.getElementById('printReportArea');
+    container.innerHTML = `
+        <div class="print-page">
+            <div class="print-header">
+                <img src="icons/icon-512.png" class="print-logo">
+                <div>
+                    <div class="print-title">C2TECH Service Tracker</div>
+                    <div class="print-subtitle">รายงานสรุปผลการดำเนินงาน</div>
+                </div>
+            </div>
+            <div class="print-meta">
+                ช่วงวันที่: ${formatThaiDate(report.startDate)} — ${formatThaiDate(report.endDate)} &nbsp;|&nbsp; ออกรายงานเมื่อ: ${formatThaiDate(new Date())}
+                ${currentUser ? ` &nbsp;|&nbsp; จัดทำโดย: ${escapeHtml(currentUser.name)}` : ''}
+            </div>
+
+            <div class="print-kpi-grid">
+                <div class="print-kpi"><div class="print-kpi-val" style="color:#16a34a;">${totalCompleted}</div><div class="print-kpi-lab">PM สำเร็จในช่วงนี้</div></div>
+                <div class="print-kpi"><div class="print-kpi-val" style="color:#e11d48;">${totalOverdue}</div><div class="print-kpi-lab">เลยกำหนด (ณ วันสิ้นสุดช่วง)</div></div>
+                <div class="print-kpi"><div class="print-kpi-val" style="color:#fb8500;">${totalUrgent}</div><div class="print-kpi-lab">ใกล้กำหนด (ภายใน 7 วัน)</div></div>
+                <div class="print-kpi"><div class="print-kpi-val" style="color:#c9960c;">${report.totalRenewed}</div><div class="print-kpi-lab">ต่ออายุแล้ว (สะสม)</div></div>
+            </div>
+
+            <div class="print-section-title">รายการเครื่องที่เลยกำหนด PM</div>
+            <table class="print-table">
+                <thead><tr><th>S/N</th><th>ลูกค้า</th><th>สถานที่</th><th>รอบ</th><th>วันแผน</th></tr></thead>
+                <tbody>${rowsOverdue}</tbody>
+            </table>
+
+            <div class="print-section-title">ประวัติ PM ที่ทำสำเร็จในช่วงนี้ (${totalCompleted} รายการ)</div>
+            <table class="print-table">
+                <thead><tr><th>วันที่ทำ</th><th>S/N</th><th>ลูกค้า</th><th>รอบ</th><th>ผู้ปฏิบัติงาน</th></tr></thead>
+                <tbody>${rowsCompleted}</tbody>
+            </table>
+
+            <div class="print-signature">
+                <div><div class="print-sign-line"></div><div class="print-sign-label">ผู้จัดทำรายงาน</div></div>
+                <div><div class="print-sign-line"></div><div class="print-sign-label">ผู้รับทราบ (ผู้บริหาร)</div></div>
+            </div>
+        </div>
+    `;
+
+    setTimeout(() => window.print(), 250); // หน่วงเล็กน้อยให้ browser render รูป/layout ก่อนเปิดหน้าต่างพิมพ์
+}
+
+// --- แบบที่ 2: รูปภาพสำหรับส่ง LINE (ใช้ html2canvas แปลง HTML card เป็น PNG) ---
+function renderLineImageReport(report) {
+    const totalOverdue = report.overdueList.length;
+    const totalUrgent = report.urgentList.length;
+    const totalCompleted = report.completedList.length;
+    const top3 = report.leaderboard.slice(0, 3);
+    const medals = ['🥇', '🥈', '🥉'];
+
+    const cardHtml = `
+        <div id="lineImageCard" style="width:400px; padding:26px 22px; background:linear-gradient(160deg,#1b4332,#0d2a1f); font-family:'Sarabun',sans-serif; color:#fff;">
+            <div style="text-align:center; margin-bottom:18px;">
+                <img src="icons/icon-512.png" style="width:56px; height:56px; border-radius:14px;">
+                <div style="font-size:16px; font-weight:800; margin-top:8px;">สรุปผล Service Tracker</div>
+                <div style="font-size:11px; opacity:.7; margin-top:2px;">${formatThaiDate(report.startDate)} — ${formatThaiDate(report.endDate)}</div>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:18px;">
+                <div style="background:rgba(255,255,255,0.08); border-radius:14px; padding:14px; text-align:center;">
+                    <div style="font-size:26px; font-weight:800; color:#4ade80;">${totalCompleted}</div>
+                    <div style="font-size:10px; opacity:.75; margin-top:2px;">PM สำเร็จ</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.08); border-radius:14px; padding:14px; text-align:center;">
+                    <div style="font-size:26px; font-weight:800; color:#fb7185;">${totalOverdue}</div>
+                    <div style="font-size:10px; opacity:.75; margin-top:2px;">เลยกำหนด</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.08); border-radius:14px; padding:14px; text-align:center;">
+                    <div style="font-size:26px; font-weight:800; color:#fdba74;">${totalUrgent}</div>
+                    <div style="font-size:10px; opacity:.75; margin-top:2px;">ใกล้กำหนด</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.08); border-radius:14px; padding:14px; text-align:center;">
+                    <div style="font-size:26px; font-weight:800; color:#ffb703;">${report.totalRenewed}</div>
+                    <div style="font-size:10px; opacity:.75; margin-top:2px;">ต่ออายุสะสม</div>
+                </div>
+            </div>
+            ${top3.length > 0 ? `
+            <div style="background:rgba(255,255,255,0.06); border-radius:14px; padding:14px;">
+                <div style="font-size:11px; font-weight:700; letter-spacing:.5px; opacity:.7; margin-bottom:10px; text-transform:uppercase;">Top ผู้ทำ PM สูงสุด</div>
+                ${top3.map((t, i) => `
+                    <div style="display:flex; justify-content:space-between; align-items:center; padding:5px 0; ${i < top3.length - 1 ? 'border-bottom:1px solid rgba(255,255,255,0.08);' : ''}">
+                        <span style="font-size:13px;">${medals[i]} ${escapeHtml(t.tech)}</span>
+                        <span style="font-size:13px; font-weight:800; color:#ffb703;">${t.count} ครั้ง</span>
+                    </div>
+                `).join('')}
+            </div>` : ''}
+            <div style="text-align:center; margin-top:18px; font-size:10px; opacity:.5;">C2TECH SERVICE TRACKER · ${formatThaiDate(new Date())}</div>
+        </div>
+    `;
+
+    const temp = document.createElement('div');
+    temp.style.position = 'fixed';
+    temp.style.left = '-9999px';
+    temp.innerHTML = cardHtml;
+    document.body.appendChild(temp);
+
+    Swal.fire({ title: 'กำลังสร้างรูปภาพ...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+    html2canvas(document.getElementById('lineImageCard'), { scale: 2 }).then(canvas => {
+        document.body.removeChild(temp);
+        const imgUrl = canvas.toDataURL('image/png');
+
+        Swal.fire({
+            title: 'รูปสรุปสำหรับ LINE',
+            html: `<img src="${imgUrl}" style="width:100%; border-radius:12px; box-shadow:0 4px 14px rgba(0,0,0,0.15);">`,
+            confirmButtonText: '<i class="fas fa-download"></i> ดาวน์โหลดรูป',
+            confirmButtonColor: '#1b4332',
+            showCancelButton: true,
+            cancelButtonText: 'ปิด'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                const link = document.createElement('a');
+                link.href = imgUrl;
+                link.download = `service_report_${report.startDate}_to_${report.endDate}.png`;
+                link.click();
+            }
+        });
+    }).catch(err => {
+        document.body.removeChild(temp);
+        Swal.fire('Error', 'สร้างรูปภาพไม่สำเร็จ: ' + err.message, 'error');
+    });
 }
 
 async function openPmDashboard() {

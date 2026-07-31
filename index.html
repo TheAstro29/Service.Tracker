@@ -26,6 +26,7 @@
         rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <link rel="stylesheet" href="style.css" />
 
 </head>
@@ -35,13 +36,15 @@
     <div class="sticky-wrapper">
         <div class="header-top">
             <div class="brand">
-                <h1>Service Tracker <span>BY C2TECH v0.6.0</span></h1>
+                <img src="icons/icon-512.png" alt="C2TECH" class="brand-logo">
+                <h1>Service Tracker</h1>
             </div>
             <div class="header-actions">
                 <i class="fas fa-user-circle admin-login-btn" id="userProfileIcon" onclick="openUserProfileOrLogin()" title="เข้าสู่ระบบ / โปรไฟล์"></i>
                 <i class="fas fa-users-gear admin-login-btn" id="userMgmtIcon" onclick="openUserManagement()" title="จัดการผู้ใช้งาน" style="display:none;"></i>
                 <i class="fas fa-chart-column admin-login-btn" id="dashboardIcon" onclick="openPmDashboard()" title="แดชบอร์ด PM" style="display:none;"></i>
                 <i class="fas fa-shield-halved admin-login-btn" id="dataValidationIcon" onclick="setupDataValidationUI()" title="ตั้งค่าป้องกันข้อมูลผิด (Data Validation)" style="display:none;"></i>
+                <i class="fas fa-file-lines admin-login-btn" id="reportIcon" onclick="openReportModal()" title="สร้างรายงานสรุป" style="display:none;"></i>
                 <i class="fas fa-lock admin-login-btn" id="lockIcon" onclick="adminAuth()" title="Admin Login"></i>
                 <button class="btn-refresh" onclick="loadData()">
                     <i class="fas fa-sync-alt" id="refreshIcon"></i> รีเฟรช
@@ -132,6 +135,8 @@
     <div class="container">
         <main id="serviceList"></main>
     </div>
+
+    <div id="printReportArea"></div>
 
     <script src="script.js"></script>
 </body>

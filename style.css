@@ -80,34 +80,27 @@ body {
     gap: var(--sp-3);
 }
 
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.brand-logo {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+    flex-shrink: 0;
+}
+
 .brand h1 {
     margin: 0;
     font-size: 19px;
     font-weight: 800;
     color: #ffffff;
     letter-spacing: -0.3px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.brand h1::before {
-    content: "";
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--accent);
-    box-shadow: 0 0 8px var(--accent);
-}
-
-.brand h1 span {
-    font-weight: 500;
-    font-size: 10.5px;
-    color: rgba(255, 255, 255, 0.55);
-    display: block;
-    letter-spacing: 0.3px;
-    margin-top: 2px;
+    white-space: nowrap;
 }
 
 .header-actions {
@@ -141,6 +134,7 @@ body {
 }
 
 .btn-refresh {
+    display: none; /* ซ่อนบน mobile เป็น default เพราะมี silent auto-refresh หลัง action ทุกครั้งอยู่แล้ว */
     background: var(--accent);
     color: var(--primary);
     border: none;
@@ -149,7 +143,6 @@ body {
     font-weight: 800;
     font-size: 13px;
     cursor: pointer;
-    display: flex;
     align-items: center;
     gap: 6px;
     box-shadow: 0 3px 10px rgba(255, 183, 3, 0.35);
@@ -158,6 +151,12 @@ body {
 
 .btn-refresh:active {
     transform: scale(0.96);
+}
+
+@media (min-width: 720px) {
+    .btn-refresh {
+        display: flex; /* จอใหญ่ (PC/Tablet) ยังโชว์ปุ่มรีเฟรชไว้ตามปกติ */
+    }
 }
 
 /* --- Filter Stat Chips --- */
@@ -833,5 +832,145 @@ textarea:focus {
 /* --- Responsive polish for very small phones --- */
 @media (max-width: 400px) {
     .brand h1 { font-size: 16px; }
+    .brand-logo { width: 28px; height: 28px; }
     .toolbar-row { gap: 6px; }
+}
+
+/* =========================================================================================
+   PDF REPORT (ซ่อนตามปกติ, โผล่มาเฉพาะตอนสั่งพิมพ์ผ่าน window.print())
+========================================================================================= */
+#printReportArea {
+    display: none;
+}
+
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    #printReportArea, #printReportArea * {
+        visibility: visible;
+    }
+    #printReportArea {
+        display: block;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+    }
+}
+
+.print-page {
+    font-family: 'Sarabun', sans-serif;
+    color: #1e293b;
+    padding: 20px;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.print-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    border-bottom: 3px solid #1b4332;
+    padding-bottom: 14px;
+    margin-bottom: 10px;
+}
+
+.print-logo {
+    width: 50px;
+    height: 50px;
+    border-radius: 12px;
+}
+
+.print-title {
+    font-size: 20px;
+    font-weight: 800;
+    color: #1b4332;
+}
+
+.print-subtitle {
+    font-size: 13px;
+    color: #64748b;
+    margin-top: 2px;
+}
+
+.print-meta {
+    font-size: 11.5px;
+    color: #64748b;
+    margin-bottom: 18px;
+}
+
+.print-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 22px;
+}
+
+.print-kpi {
+    border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 12px 8px;
+    text-align: center;
+}
+
+.print-kpi-val {
+    font-size: 24px;
+    font-weight: 800;
+    line-height: 1.1;
+}
+
+.print-kpi-lab {
+    font-size: 10px;
+    color: #64748b;
+    margin-top: 4px;
+    font-weight: 700;
+}
+
+.print-section-title {
+    font-size: 13px;
+    font-weight: 800;
+    color: #1b4332;
+    margin: 18px 0 8px;
+    padding-bottom: 6px;
+    border-bottom: 1.5px solid #e2e8f0;
+}
+
+.print-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+}
+
+.print-table th {
+    background: #f0fdf4;
+    color: #1b4332;
+    text-align: left;
+    padding: 6px 8px;
+    border: 1px solid #e2e8f0;
+    font-weight: 700;
+}
+
+.print-table td {
+    padding: 6px 8px;
+    border: 1px solid #e2e8f0;
+}
+
+.print-signature {
+    display: flex;
+    justify-content: space-around;
+    margin-top: 60px;
+    page-break-inside: avoid;
+}
+
+.print-sign-line {
+    width: 200px;
+    border-bottom: 1.5px dashed #64748b;
+    margin-bottom: 6px;
+}
+
+.print-sign-label {
+    font-size: 11px;
+    color: #64748b;
+    text-align: center;
 }
