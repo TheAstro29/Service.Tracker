@@ -25,10 +25,7 @@ async function adminAuth() {
         isAdmin = false;
         adminPasswordCache = '';
         document.getElementById('lockIcon').className = 'fas fa-lock admin-login-btn';
-        document.getElementById('userMgmtIcon').style.display = 'none';
-        document.getElementById('dashboardIcon').style.display = 'none';
-        document.getElementById('dataValidationIcon').style.display = 'none';
-        document.getElementById('reportIcon').style.display = 'none';
+        document.getElementById('adminMenuIcon').style.display = 'none';
         Swal.fire({ icon: 'info', title: 'ออกจากระบบ Admin', timer: 1000, showConfirmButton: false });
         render();
         return;
@@ -50,10 +47,7 @@ async function adminAuth() {
         isAdmin = true;
         adminPasswordCache = password;
         document.getElementById('lockIcon').className = 'fas fa-lock-open admin-login-btn active';
-        document.getElementById('userMgmtIcon').style.display = 'inline-flex';
-        document.getElementById('dashboardIcon').style.display = 'inline-flex';
-        document.getElementById('dataValidationIcon').style.display = 'inline-flex';
-        document.getElementById('reportIcon').style.display = 'inline-flex';
+        document.getElementById('adminMenuIcon').style.display = 'inline-flex';
         Swal.fire({ icon: 'success', title: 'ยินดีต้อนรับ Admin', timer: 1000, showConfirmButton: false });
         render();
     } else if (password) {
@@ -1209,6 +1203,33 @@ function formatThaiDate(isoOrDateStr) {
     const d = new Date(isoOrDateStr);
     if (isNaN(d.getTime())) return '-';
     return d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function openAdminMenu() {
+    if (!isAdmin) { Swal.fire({ icon: 'warning', title: 'สิทธิ์ไม่เพียงพอ' }); return; }
+
+    Swal.fire({
+        title: '<i class="fas fa-toolbox" style="color:#1b4332;"></i> เมนู Admin',
+        html: `
+            <div style="text-align:left; display:flex; flex-direction:column; gap:8px;">
+                <button onclick="Swal.close(); openPmDashboard();" class="admin-menu-item">
+                    <i class="fas fa-chart-column"></i> แดชบอร์ด PM
+                </button>
+                <button onclick="Swal.close(); openUserManagement();" class="admin-menu-item">
+                    <i class="fas fa-users-gear"></i> จัดการผู้ใช้งาน
+                </button>
+                <button onclick="Swal.close(); openReportModal();" class="admin-menu-item">
+                    <i class="fas fa-file-lines"></i> สร้างรายงานสรุป
+                </button>
+                <button onclick="Swal.close(); setupDataValidationUI();" class="admin-menu-item">
+                    <i class="fas fa-shield-halved"></i> ตั้งค่าป้องกันข้อมูลผิด
+                </button>
+            </div>
+        `,
+        showConfirmButton: false,
+        showCloseButton: true,
+        width: '340px'
+    });
 }
 
 async function openReportModal() {

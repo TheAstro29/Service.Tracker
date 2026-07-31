@@ -974,3 +974,24 @@ textarea:focus {
     color: #64748b;
     text-align: center;
 }
+
+/* Admin Menu (รวมเมนู Admin เป็นลิสต์เดียว) */
+.admin-menu-item {
+    width: 100%;
+    text-align: left;
+    background: #f4f7f6;
+    border: 1px solid #e2e8f0;
+    padding: 12px 14px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 13.5px;
+    color: #1b4332;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: 0.15s;
+}
+.admin-menu-item:hover {
+    background: #e8f5e9;
+}
