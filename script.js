@@ -752,7 +752,7 @@ function openUserProfileModal() {
 
     Swal.fire({
         html: `
-            <div style="max-width:340px; margin:-10px auto 0; border-radius:20px; overflow:hidden; box-shadow:0 14px 34px rgba(27,67,50,0.28); font-family:'Sarabun',sans-serif;">
+            <div style="max-width:360px; margin:0 auto; border-radius:20px; overflow:hidden; box-shadow:0 14px 34px rgba(27,67,50,0.35); font-family:'Sarabun',sans-serif;">
                 <div style="background:linear-gradient(155deg, #1b4332 0%, #2d6a4f 100%); padding:26px 20px 22px; text-align:center; color:#fff; position:relative;">
                     <div style="position:absolute; top:12px; right:16px; font-size:9px; letter-spacing:1.5px; opacity:.55; font-weight:700;">C2TECH</div>
                     <div style="font-size:10px; letter-spacing:2.5px; text-transform:uppercase; opacity:.6; margin-bottom:16px;">Service Tracker · Staff ID</div>
@@ -796,11 +796,15 @@ function openUserProfileModal() {
                 </div>
             </div>
         `,
-        width: '400px',
-        padding: '20px 10px',
+        width: '360px',
+        padding: 0,
+        background: 'transparent',
         showConfirmButton: false,
         showCloseButton: true,
-        background: '#f4f7f6',
+        customClass: {
+            popup: 'profile-card-popup',
+            closeButton: 'profile-card-close-btn'
+        },
         didOpen: () => {
             document.getElementById('profile-change-photo-btn').onclick = () => {
                 document.getElementById('profile-photo-input').click(); // เปิด "เลือกรูปจากอัลบั้ม" ของเครื่องโดยตรง (ไม่บังคับกล้อง เหมือนรูปหน้างาน PM)
