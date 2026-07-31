@@ -381,6 +381,31 @@ input:checked + .compact-slider:before {
 }
 
 /* =========================================================================================
+   PROFILE CARD POPUP (บัตรพนักงาน) — ลบกรอบ/เงา/พื้นหลังเดิมของ Swal ออกให้เหลือแต่การ์ด
+========================================================================================= */
+.profile-card-popup {
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+}
+
+.profile-card-close-btn {
+    color: #ffffff !important;
+    top: 14px !important;
+    right: 14px !important;
+    width: 30px !important;
+    height: 30px !important;
+    background: rgba(0, 0, 0, 0.18) !important;
+    border-radius: 50% !important;
+    font-size: 18px !important;
+}
+
+.profile-card-close-btn:hover {
+    background: rgba(0, 0, 0, 0.32) !important;
+    color: #ffffff !important;
+}
+
+/* =========================================================================================
    LOADING SCREEN
 ========================================================================================= */
 .loader-main {
