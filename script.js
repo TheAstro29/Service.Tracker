@@ -27,6 +27,7 @@ async function adminAuth() {
         document.getElementById('lockIcon').className = 'fas fa-lock admin-login-btn';
         document.getElementById('userMgmtIcon').style.display = 'none';
         document.getElementById('dashboardIcon').style.display = 'none';
+        document.getElementById('dataValidationIcon').style.display = 'none';
         Swal.fire({ icon: 'info', title: 'ออกจากระบบ Admin', timer: 1000, showConfirmButton: false });
         render();
         return;
@@ -50,6 +51,7 @@ async function adminAuth() {
         document.getElementById('lockIcon').className = 'fas fa-lock-open admin-login-btn active';
         document.getElementById('userMgmtIcon').style.display = 'inline-flex';
         document.getElementById('dashboardIcon').style.display = 'inline-flex';
+        document.getElementById('dataValidationIcon').style.display = 'inline-flex';
         Swal.fire({ icon: 'success', title: 'ยินดีต้อนรับ Admin', timer: 1000, showConfirmButton: false });
         render();
     } else if (password) {
@@ -1141,6 +1143,57 @@ async function deleteUserConfirm(userId, name) {
 ========================================================================================= */
 
 let pmDashboardChart = null;
+
+/* =========================================================================================
+   Admin: ตั้งค่า Data Validation (กันกรอกข้อมูลผิดในชีต)
+========================================================================================= */
+
+async function setupDataValidationUI() {
+    if (!isAdmin) { Swal.fire({ icon: 'warning', title: 'สิทธิ์ไม่เพียงพอ', text: 'กรุณาล็อกอินเป็น Admin ก่อน' }); return; }
+
+    const confirm = await Swal.fire({
+        icon: 'question',
+        title: 'ตั้งค่า Data Validation?',
+        html: `
+            <div style="text-align:left; font-size:13px;">
+                ระบบจะเพิ่ม dropdown บังคับเลือกให้กับคอลัมน์เหล่านี้ (กันกรอกข้อมูลผิดตอนแก้ในชีตโดยตรง):
+                <ul style="font-size:12px; margin:8px 0; padding-left:20px;">
+                    <li><b>Panolyzer Data:</b> Status, Model, Mode, Type</li>
+                    <li><b>Machine_History:</b> Status, Result, Mode</li>
+                    <li><b>Users:</b> Gender, Status</li>
+                </ul>
+                <small style="color:#94a3b8;">ไม่กระทบข้อมูลเดิมที่มีอยู่แล้ว มีผลแค่ตอนแก้ไขค่าในเซลล์นั้นครั้งต่อไปเท่านั้น</small>
+            </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'ตั้งค่าเลย',
+        confirmButtonColor: '#1b4332',
+        cancelButtonText: 'ยกเลิก'
+    });
+    if (!confirm.isConfirmed) return;
+
+    Swal.fire({ title: 'กำลังตั้งค่า...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+    try {
+        const res = await fetch(SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'setup_data_validation', adminPassword: adminPasswordCache }),
+            headers: { "Content-Type": "text/plain;charset=utf-8" }
+        });
+        const data = await res.json();
+        if (data.status !== 'success') throw new Error(data.message);
+
+        await Swal.fire({
+            icon: 'success',
+            title: 'ตั้งค่าเรียบร้อย',
+            html: `<div style="text-align:left; font-size:12px;">${(data.details || []).map(d => `• ${escapeHtml(d)}`).join('<br>')}</div>`,
+            confirmButtonColor: '#1b4332',
+            confirmButtonText: 'รับทราบ'
+        });
+    } catch (e) {
+        Swal.fire('Error', e.message || 'ตั้งค่าไม่สำเร็จ', 'error');
+    }
+}
 
 async function openPmDashboard() {
     if (!isAdmin) { Swal.fire({ icon: 'warning', title: 'สิทธิ์ไม่เพียงพอ', text: 'กรุณาล็อกอินเป็น Admin ก่อน' }); return; }
