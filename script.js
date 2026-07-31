@@ -182,6 +182,18 @@ function wireTogglePassword(inputId) {
     };
 }
 
+// แปลง Google Drive URL แบบ "หน้า Preview" (.../file/d/ID/view) ให้เป็น URL แบบ direct-image
+// (lh3.googleusercontent.com) ที่ใช้กับ <img src="..."> ได้จริง — เผื่อมีรูปเก่าที่เคยเก็บ URL ผิดแบบไว้ก่อนแก้บั๊ก
+// ถ้า url ไม่ตรง pattern นี้ (เช่นเป็น URL ที่ถูกต้องอยู่แล้ว) จะคืนค่าเดิมโดยไม่แก้อะไร
+function toDriveImageUrl(url) {
+    if (!url) return url;
+    const match = String(url).match(/\/file\/d\/([^/]+)/);
+    if (match && match[1]) {
+        return `https://lh3.googleusercontent.com/d/${match[1]}`;
+    }
+    return url;
+}
+
 function render() {
     const main = document.getElementById('serviceList');
     main.innerHTML = '';
@@ -742,7 +754,7 @@ function openUserProfileModal() {
                 <div style="background:linear-gradient(155deg, #1b4332 0%, #2d6a4f 100%); padding:26px 20px 22px; text-align:center; color:#fff; position:relative;">
                     <div style="position:absolute; top:12px; right:16px; font-size:9px; letter-spacing:1.5px; opacity:.55; font-weight:700;">C2TECH</div>
                     <div style="font-size:10px; letter-spacing:2.5px; text-transform:uppercase; opacity:.6; margin-bottom:16px;">Service Tracker · Staff ID</div>
-                    <img id="profile-photo-preview" src="${currentUser.photo || 'https://placehold.co/100x100/1b4332/ffffff?text=' + encodeURIComponent(currentUser.name.charAt(0))}"
+                    <img id="profile-photo-preview" src="${toDriveImageUrl(currentUser.photo) || 'https://placehold.co/100x100/1b4332/ffffff?text=' + encodeURIComponent(currentUser.name.charAt(0))}"
                          style="width:92px; height:92px; border-radius:50%; object-fit:cover; border:3px solid #ffb703; background:#fff; box-shadow:0 4px 12px rgba(0,0,0,0.25);">
                     <div style="font-size:19px; font-weight:800; margin-top:14px; letter-spacing:.2px;">${escapeHtml(currentUser.name)}</div>
                     <div style="font-size:12.5px; opacity:.85; margin-top:3px;">${escapeHtml(currentUser.position || 'ยังไม่ระบุตำแหน่ง')}</div>
@@ -945,7 +957,7 @@ async function openUserManagement() {
 
     const rowsHtml = users.map(u => `
         <tr style="border-bottom:1px solid #f1f5f9;">
-            <td style="padding:8px;"><img src="${u.photo || 'https://placehold.co/32x32?text=%20'}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;background:#eee;"></td>
+            <td style="padding:8px;"><img src="${toDriveImageUrl(u.photo) || 'https://placehold.co/32x32?text=%20'}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;background:#eee;"></td>
             <td style="padding:8px; text-align:left; font-size:13px;">
                 <b>${escapeHtml(u.name)}</b> <span style="font-size:10px; color:#1b4332; background:#e8f5e9; padding:1px 6px; border-radius:999px; font-family:monospace;">@${escapeHtml(u.username)}</span> ${u.status === 'Inactive' ? '<span style="color:#94a3b8;font-size:10px;">(ปิดใช้งาน)</span>' : ''}<br>
                 <small style="color:#94a3b8;">${escapeHtml(u.position || '-')} · ${u.age ?? '-'} ปี</small>
