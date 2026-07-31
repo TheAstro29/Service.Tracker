@@ -34,10 +34,12 @@ async function adminAuth() {
 
     const { value: password } = await Swal.fire({
         title: 'Admin Access',
-        input: 'password',
-        inputLabel: 'กรุณาใส่รหัสผ่าน',
-        inputPlaceholder: 'Password',
-        confirmButtonColor: '#1b4332'
+        html: passwordFieldHtml('admin-pw-input', 'Password'),
+        confirmButtonColor: '#1b4332',
+        showCancelButton: true,
+        cancelButtonText: 'ยกเลิก',
+        didOpen: () => wireTogglePassword('admin-pw-input'),
+        preConfirm: () => document.getElementById('admin-pw-input').value
     });
 
     if (password === undefined) return; // กดยกเลิก
@@ -153,6 +155,31 @@ function escapeHtml(str) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
+}
+
+// สร้าง HTML ของช่องกรอกรหัสผ่านที่มีปุ่มรูปตาไว้ดู/ซ่อนรหัสผ่านที่พิมพ์ ใช้ร่วมกันได้ทุกฟอร์มในแอป
+// หลังใส่ html นี้แล้ว ต้องเรียก wireTogglePassword(id) ใน didOpen ของ Swal ด้วยเสมอ ไม่งั้นปุ่มจะไม่ทำงาน
+function passwordFieldHtml(id, placeholder, style, autocomplete) {
+    return `
+        <div style="position:relative; ${style || 'margin:0;'}">
+            <input type="password" id="${id}" class="swal2-input" placeholder="${escapeHtml(placeholder)}" style="margin:0; width:100%; padding-right:42px;" autocomplete="${autocomplete || 'off'}">
+            <button type="button" id="${id}-toggle" tabindex="-1" style="position:absolute; right:8px; top:0; bottom:0; background:none; border:none; color:#94a3b8; cursor:pointer; font-size:15px; padding:0 8px;">
+                <i class="fas fa-eye"></i>
+            </button>
+        </div>
+    `;
+}
+
+// เชื่อมปุ่มรูปตาให้ทำงานจริง (สลับ type ระหว่าง password/text) — เรียกใน didOpen ของ Swal
+function wireTogglePassword(inputId) {
+    const input = document.getElementById(inputId);
+    const btn = document.getElementById(`${inputId}-toggle`);
+    if (!input || !btn) return;
+    btn.onclick = () => {
+        const willShow = input.type === 'password';
+        input.type = willShow ? 'text' : 'password';
+        btn.innerHTML = willShow ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
+    };
 }
 
 function render() {
@@ -627,12 +654,13 @@ async function showLoginModal() {
         title: '<i class="fas fa-id-badge" style="color:#1b4332;"></i> เข้าสู่ระบบ',
         html: `
             <input id="login-username" class="swal2-input" placeholder="Username" style="margin:0 0 10px;" autocomplete="username">
-            <input id="login-password" type="password" class="swal2-input" placeholder="รหัสผ่าน" style="margin:0;" autocomplete="current-password">
+            ${passwordFieldHtml('login-password', 'รหัสผ่าน', 'margin:0;', 'current-password')}
         `,
         confirmButtonText: 'เข้าสู่ระบบ',
         confirmButtonColor: '#1b4332',
         showCancelButton: true,
         cancelButtonText: 'ยกเลิก',
+        didOpen: () => wireTogglePassword('login-password'),
         preConfirm: () => {
             const username = document.getElementById('login-username').value.trim();
             const password = document.getElementById('login-password').value;
@@ -834,8 +862,8 @@ function openUserProfileEditModal() {
                 <div style="font-size:11px; font-weight:800; color:#c2410c; text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px;">
                     <i class="fas fa-lock"></i> เปลี่ยนรหัสผ่าน (เว้นว่างไว้ถ้าไม่ต้องการเปลี่ยน)
                 </div>
-                <input type="password" id="profile-current-pw" class="swal2-input" placeholder="รหัสผ่านปัจจุบัน" style="margin:0 0 8px; width:100%; height:38px;" autocomplete="current-password">
-                <input type="password" id="profile-new-pw" class="swal2-input" placeholder="รหัสผ่านใหม่" style="margin:0; width:100%; height:38px;" autocomplete="new-password">
+                ${passwordFieldHtml('profile-current-pw', 'รหัสผ่านปัจจุบัน', 'margin:0 0 8px;', 'current-password')}
+                ${passwordFieldHtml('profile-new-pw', 'รหัสผ่านใหม่', 'margin:0;', 'new-password')}
             </div>
         `,
         width: '480px',
@@ -844,6 +872,8 @@ function openUserProfileEditModal() {
         confirmButtonColor: '#1b4332',
         cancelButtonText: 'ยกเลิก',
         didOpen: () => {
+            wireTogglePassword('profile-current-pw');
+            wireTogglePassword('profile-new-pw');
             document.getElementById('profile-birthdate').addEventListener('change', (e) => {
                 document.getElementById('profile-age-display').innerText = `อายุ: ${calculateAgeJS(e.target.value) ?? '-'} ปี (คำนวณอัตโนมัติจากวันเกิด)`;
             });
