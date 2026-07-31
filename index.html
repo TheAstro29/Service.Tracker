@@ -7,6 +7,17 @@
     <meta name="theme-color" content="#1b4332">
     <title>Service Tracker by C2TECH</title>
 
+    <!-- โลโก้ / ไอคอนสำหรับ Add to Home Screen -->
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="C2TECH Service">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="application-name" content="C2TECH Service">
+
     <link rel="preconnect" href="https://cdnjs.cloudflare.com">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
@@ -14,6 +25,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap"
         rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
     <link rel="stylesheet" href="style.css" />
 
 </head>
@@ -23,9 +35,12 @@
     <div class="sticky-wrapper">
         <div class="header-top">
             <div class="brand">
-                <h1>Service Tracker <span>BY C2TECH v1.0</span></h1>
+                <h1>Service Tracker <span>BY C2TECH v0.6.0</span></h1>
             </div>
             <div class="header-actions">
+                <i class="fas fa-user-circle admin-login-btn" id="userProfileIcon" onclick="openUserProfileOrLogin()" title="เข้าสู่ระบบ / โปรไฟล์"></i>
+                <i class="fas fa-users-gear admin-login-btn" id="userMgmtIcon" onclick="openUserManagement()" title="จัดการผู้ใช้งาน" style="display:none;"></i>
+                <i class="fas fa-chart-column admin-login-btn" id="dashboardIcon" onclick="openPmDashboard()" title="แดชบอร์ด PM" style="display:none;"></i>
                 <i class="fas fa-lock admin-login-btn" id="lockIcon" onclick="adminAuth()" title="Admin Login"></i>
                 <button class="btn-refresh" onclick="loadData()">
                     <i class="fas fa-sync-alt" id="refreshIcon"></i> รีเฟรช
@@ -100,15 +115,13 @@
 
     <div id="loading" class="loader-main" style="display: block;">
         <div class="loader-container">
-            <div class="custom-tech-loader">
-                <div class="loader-ring ring-outer"></div>
-                <div class="loader-ring ring-inner"></div>
-                <div class="loader-center-icon">
-                    <i class="fas fa-sync-alt fa-spin-custom"></i>
-                </div>
+            <div class="logo-loader">
+                <div class="logo-ring"></div>
+                <div class="logo-glow"></div>
+                <img src="icons/icon-512.png" alt="C2TECH" class="logo-img">
             </div>
-            <div class="loader-text">กำลังเชื่อมต่อข้อมูลล่าสุด...</div>
-            <div class="loader-subtext">SERVICE TRACKER BY C2TECH</div>
+            <div class="loader-brand">C2TECH <span>SERVICE TRACKER</span></div>
+            <div class="loader-text" id="loaderStatusText">กำลังเชื่อมต่อข้อมูลล่าสุด...</div>
             <div class="loader-bar-wrapper">
                 <div class="loader-progress-bar"></div>
             </div>

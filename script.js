@@ -16,12 +16,17 @@ let isAdmin = false;
 let adminPasswordCache = ''; // เก็บรหัสไว้ใน memory เท่านั้น เพื่อส่งให้ backend เช็คซ้ำทุกครั้งที่ Renew
 const _0x1a2b = "MTkwOTE1MTI="
 
-// ฟังก์ชันเข้าสู่ระบบ
+// ผู้ใช้งานที่ login อยู่ปัจจุบัน (คนละระบบกับ Admin) — เก็บไว้ใน localStorage ให้จำ session ไว้ข้ามการเปิดแอปใหม่
+let currentUser = JSON.parse(localStorage.getItem('current_user') || 'null');
+
+// ฟังก์ชันเข้าสู่ระบบ Admin
 async function adminAuth() {
     if (isAdmin) {
         isAdmin = false;
         adminPasswordCache = '';
         document.getElementById('lockIcon').className = 'fas fa-lock admin-login-btn';
+        document.getElementById('userMgmtIcon').style.display = 'none';
+        document.getElementById('dashboardIcon').style.display = 'none';
         Swal.fire({ icon: 'info', title: 'ออกจากระบบ Admin', timer: 1000, showConfirmButton: false });
         render();
         return;
@@ -41,6 +46,8 @@ async function adminAuth() {
         isAdmin = true;
         adminPasswordCache = password;
         document.getElementById('lockIcon').className = 'fas fa-lock-open admin-login-btn active';
+        document.getElementById('userMgmtIcon').style.display = 'inline-flex';
+        document.getElementById('dashboardIcon').style.display = 'inline-flex';
         Swal.fire({ icon: 'success', title: 'ยินดีต้อนรับ Admin', timer: 1000, showConfirmButton: false });
         render();
     } else if (password) {
@@ -243,8 +250,10 @@ function render() {
         // สร้างส่วน UI ของ Renew โดยเช็คเงื่อนไข isAdmin
         const renewUI = isAdmin ? `
                 <div style="margin-top:15px; border-top:1px dashed var(--border); padding-top:12px;">
-                    <label style="font-size:11px; font-weight:800; color:var(--primary); display:flex; align-items:center; gap:6px;"><i class="fas fa-rotate"></i> ต่ออายุ Service รายปี (ระบุวันที่เริ่ม)</label>
-                    <div class="action-group" style="margin-top:8px;">
+                    <label style="font-size:11px; font-weight:800; color:var(--primary); display:flex; align-items:center; gap:6px;"><i class="fas fa-rotate"></i> ต่ออายุ Service รายปี</label>
+                    <div style="font-size:10.5px; color:var(--text-sub); margin-top:2px;">ระบุ "วันที่เริ่มสัญญารอบใหม่" ระบบจะคำนวณวันนัด PM 1-3 ให้อัตโนมัติ (ทุก 4 เดือน)</div>
+                    <label for="renew-${sn}" style="font-size:10.5px; font-weight:700; color:var(--text-sub); display:block; margin-top:8px;">วันที่เริ่มสัญญาใหม่</label>
+                    <div class="action-group" style="margin-top:4px;">
                         <input type="date" id="renew-${sn}" style="flex:2; padding:10px; border-radius:var(--r-md); border:1.5px solid var(--border); font-family:'Sarabun'; font-size:13px;">
                         <button class="btn-save" onclick="renewService('${sn}')" style="background:var(--secondary); flex:1;"><i class="fas fa-check"></i> เริ่มรอบใหม่</button>
                     </div>
@@ -339,30 +348,38 @@ function getGpsLink() {
     });
 }
 
-// --- ฟังก์ชันบันทึกข้อมูลพร้อม GPS จริงและชื่อช่างผู้ปฏิบัติงาน ---
+// --- ฟังก์ชันบันทึกข้อมูลพร้อม GPS จริงและชื่อผู้ปฏิบัติงาน (ต้อง login ก่อนเท่านั้น) ---
 async function handleCheck(box, sn, stepKey) {
     if (!box.checked) return;
 
-    const savedTechName = localStorage.getItem('tech_name') || '';
+    if (!currentUser) {
+        box.checked = false;
+        const doLogin = await Swal.fire({
+            icon: 'info',
+            title: 'ต้องเข้าสู่ระบบก่อน',
+            text: 'กรุณาเข้าสู่ระบบด้วยบัญชีของคุณก่อน จึงจะบันทึกการเข้า PM ได้ (เพื่อระบุตัวผู้ปฏิบัติงานให้ถูกต้อง)',
+            showCancelButton: true,
+            confirmButtonText: 'เข้าสู่ระบบ',
+            confirmButtonColor: '#1b4332',
+            cancelButtonText: 'ยกเลิก'
+        });
+        if (doLogin.isConfirmed) await showLoginModal();
+        return;
+    }
 
     const confirm = await Swal.fire({
         title: 'ยืนยันปิดงาน?',
-        html: `
-            <p style="margin-bottom:12px; color:#475569;">คุณต้องการบันทึกการเข้าบริการในครั้งนี้ใช่หรือไม่?</p>
-            <input id="swal-tech-name" class="swal2-input" placeholder="ชื่อช่างผู้ปฏิบัติงาน" value="${escapeHtml(savedTechName)}" style="margin:0;">
-        `,
+        html: `<p style="margin:0; color:#475569;">บันทึกในนามของ <b>${escapeHtml(currentUser.name)}</b> ใช่หรือไม่?</p>`,
         icon: 'question',
         showCancelButton: true,
         confirmButtonColor: '#1b4332',
         confirmButtonText: 'ตกลง',
-        cancelButtonText: 'ยกเลิก',
-        preConfirm: () => document.getElementById('swal-tech-name').value.trim()
+        cancelButtonText: 'ยกเลิก'
     });
 
     if (!confirm.isConfirmed) { box.checked = false; return; }
 
-    const techName = confirm.value;
-    if (techName) localStorage.setItem('tech_name', techName); // จำชื่อไว้ ไม่ต้องพิมพ์ซ้ำครั้งหน้า
+    const techName = currentUser.name;
 
     // บังคับให้ต้องได้ตำแหน่ง GPS จริงก่อนถึงจะบันทึกปิดงานได้ — วนลองใหม่ได้ไม่จำกัดครั้ง หรือกดยกเลิกออกได้ทุกเมื่อ
     let gpsResult = null;
@@ -581,6 +598,603 @@ function smartToggle(m) {
     runFilters();
 }
 
+/* =========================================================================================
+   ระบบ User Login / โปรไฟล์ผู้ใช้ (คนละระบบกับ Admin)
+========================================================================================= */
+
+function updateUserProfileIcon() {
+    const icon = document.getElementById('userProfileIcon');
+    if (!icon) return;
+    if (currentUser) {
+        icon.className = 'fas fa-circle-check admin-login-btn active';
+        icon.title = `เข้าสู่ระบบเป็น: ${currentUser.name}`;
+    } else {
+        icon.className = 'fas fa-user-circle admin-login-btn';
+        icon.title = 'เข้าสู่ระบบ / โปรไฟล์';
+    }
+}
+
+function openUserProfileOrLogin() {
+    if (currentUser) {
+        openUserProfileModal();
+    } else {
+        showLoginModal();
+    }
+}
+
+async function showLoginModal() {
+    const result = await Swal.fire({
+        title: '<i class="fas fa-id-badge" style="color:#1b4332;"></i> เข้าสู่ระบบ',
+        html: `
+            <input id="login-username" class="swal2-input" placeholder="Username" style="margin:0 0 10px;" autocomplete="username">
+            <input id="login-password" type="password" class="swal2-input" placeholder="รหัสผ่าน" style="margin:0;" autocomplete="current-password">
+        `,
+        confirmButtonText: 'เข้าสู่ระบบ',
+        confirmButtonColor: '#1b4332',
+        showCancelButton: true,
+        cancelButtonText: 'ยกเลิก',
+        preConfirm: () => {
+            const username = document.getElementById('login-username').value.trim();
+            const password = document.getElementById('login-password').value;
+            if (!username || !password) {
+                Swal.showValidationMessage('กรุณากรอก Username และรหัสผ่าน');
+                return false;
+            }
+            return { username, password };
+        }
+    });
+
+    if (!result.isConfirmed) return;
+
+    Swal.fire({ title: 'กำลังเข้าสู่ระบบ...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+    try {
+        const response = await fetch(SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'user_login', username: result.value.username, password: result.value.password }),
+            headers: { "Content-Type": "text/plain;charset=utf-8" }
+        });
+        const res = await response.json();
+        if (res.status !== 'success') throw new Error(res.message || 'เข้าสู่ระบบไม่สำเร็จ');
+
+        currentUser = res.user;
+        localStorage.setItem('current_user', JSON.stringify(currentUser));
+        updateUserProfileIcon();
+        Swal.close();
+        Toast.fire({ icon: 'success', title: `ยินดีต้อนรับ ${currentUser.name}` });
+    } catch (err) {
+        console.error('Login error:', err);
+        Swal.fire({ icon: 'error', title: 'เข้าสู่ระบบไม่สำเร็จ', text: err.message });
+    }
+}
+
+function logoutUser() {
+    currentUser = null;
+    localStorage.removeItem('current_user');
+    updateUserProfileIcon();
+    Swal.close();
+    Toast.fire({ icon: 'info', title: 'ออกจากระบบแล้ว' });
+}
+
+// อัปโหลดรูปโปรไฟล์ (ใช้ฟังก์ชันย่อรูป/อ่านไฟล์เดียวกับรูป PM แต่ action คนละตัว)
+async function uploadUserPhoto(rawDataUrlOrFile) {
+    const rawDataUrl = (rawDataUrlOrFile instanceof File) ? await readFileAsDataUrl(rawDataUrlOrFile) : rawDataUrlOrFile;
+    const imageData = await resizeImageDataUrl(rawDataUrl, 500, 0.7);
+    const response = await fetch(SCRIPT_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'user_photo', image: imageData, fileName: `USER_${Date.now()}.jpg` }),
+        headers: { "Content-Type": "text/plain;charset=utf-8" }
+    });
+    const result = await response.json();
+    if (result.status !== 'success') throw new Error(result.message || 'อัปโหลดรูปไม่สำเร็จ');
+    return result.url;
+}
+
+function calculateAgeJS(birthdateStr) {
+    if (!birthdateStr) return null;
+    const bd = new Date(birthdateStr);
+    if (isNaN(bd.getTime())) return null;
+    const today = new Date();
+    let age = today.getFullYear() - bd.getFullYear();
+    const m = today.getMonth() - bd.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < bd.getDate())) age--;
+    return age;
+}
+
+// การ์ดบัตรพนักงาน (view mode) — กดปุ่ม "แก้ไขข้อมูล" เพื่อเปิดฟอร์มแก้ไขแยกต่างหาก
+function openUserProfileModal() {
+    const genderIcon = currentUser.gender === 'ชาย' ? 'fa-mars' : (currentUser.gender === 'หญิง' ? 'fa-venus' : 'fa-genderless');
+    const birthDisplay = currentUser.birthdate
+        ? new Date(currentUser.birthdate).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })
+        : '-';
+
+    Swal.fire({
+        html: `
+            <div style="max-width:340px; margin:-10px auto 0; border-radius:20px; overflow:hidden; box-shadow:0 14px 34px rgba(27,67,50,0.28); font-family:'Sarabun',sans-serif;">
+                <div style="background:linear-gradient(155deg, #1b4332 0%, #2d6a4f 100%); padding:26px 20px 22px; text-align:center; color:#fff; position:relative;">
+                    <div style="position:absolute; top:12px; right:16px; font-size:9px; letter-spacing:1.5px; opacity:.55; font-weight:700;">C2TECH</div>
+                    <div style="font-size:10px; letter-spacing:2.5px; text-transform:uppercase; opacity:.6; margin-bottom:16px;">Service Tracker · Staff ID</div>
+                    <img id="profile-photo-preview" src="${currentUser.photo || 'https://placehold.co/100x100/1b4332/ffffff?text=' + encodeURIComponent(currentUser.name.charAt(0))}"
+                         style="width:92px; height:92px; border-radius:50%; object-fit:cover; border:3px solid #ffb703; background:#fff; box-shadow:0 4px 12px rgba(0,0,0,0.25);">
+                    <div style="font-size:19px; font-weight:800; margin-top:14px; letter-spacing:.2px;">${escapeHtml(currentUser.name)}</div>
+                    <div style="font-size:12.5px; opacity:.85; margin-top:3px;">${escapeHtml(currentUser.position || 'ยังไม่ระบุตำแหน่ง')}</div>
+                </div>
+                <div style="background:#fff; padding:18px 22px 22px; text-align:left;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; padding-bottom:12px; margin-bottom:14px; border-bottom:1.5px dashed #e2e8f0;">
+                        <span style="font-size:10px; letter-spacing:1.5px; color:#94a3b8; text-transform:uppercase; font-weight:700;">Username</span>
+                        <span style="font-size:14px; font-weight:800; color:#1b4332; font-family:'Courier New',monospace; background:#f0fdf4; padding:3px 10px; border-radius:6px;">${escapeHtml(currentUser.username || '-')}</span>
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; font-size:13px;">
+                        <div>
+                            <div style="font-size:10px; color:#94a3b8; text-transform:uppercase; letter-spacing:.5px; font-weight:700;"><i class="fas ${genderIcon}"></i> เพศ</div>
+                            <div style="font-weight:700; margin-top:3px;">${escapeHtml(currentUser.gender || '-')}</div>
+                        </div>
+                        <div>
+                            <div style="font-size:10px; color:#94a3b8; text-transform:uppercase; letter-spacing:.5px; font-weight:700;"><i class="fas fa-cake-candles"></i> อายุ</div>
+                            <div style="font-weight:700; margin-top:3px;">${currentUser.age ?? '-'} ปี</div>
+                        </div>
+                        <div style="grid-column:span 2;">
+                            <div style="font-size:10px; color:#94a3b8; text-transform:uppercase; letter-spacing:.5px; font-weight:700;"><i class="fas fa-gift"></i> วันเกิด</div>
+                            <div style="font-weight:700; margin-top:3px;">${birthDisplay}</div>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; gap:8px; margin-top:20px;">
+                        <button type="button" id="profile-change-photo-btn" style="flex:1; background:#475569; color:#fff; border:none; padding:11px; border-radius:10px; font-weight:700; font-size:12.5px; cursor:pointer;">
+                            <i class="fas fa-images"></i> เปลี่ยนรูป
+                        </button>
+                        <button type="button" id="profile-open-edit-btn" style="flex:1; background:#1b4332; color:#fff; border:none; padding:11px; border-radius:10px; font-weight:700; font-size:12.5px; cursor:pointer;">
+                            <i class="fas fa-pen"></i> แก้ไขข้อมูล
+                        </button>
+                    </div>
+                    <input type="file" id="profile-photo-input" accept="image/*" style="display:none;">
+                    <button type="button" onclick="logoutUser()" style="width:100%; background:none; border:none; color:#e11d48; font-weight:700; cursor:pointer; font-size:12.5px; margin-top:14px; padding:4px;">
+                        <i class="fas fa-right-from-bracket"></i> ออกจากระบบ
+                    </button>
+                </div>
+            </div>
+        `,
+        width: '400px',
+        padding: '20px 10px',
+        showConfirmButton: false,
+        showCloseButton: true,
+        background: '#f4f7f6',
+        didOpen: () => {
+            document.getElementById('profile-change-photo-btn').onclick = () => {
+                document.getElementById('profile-photo-input').click(); // เปิด "เลือกรูปจากอัลบั้ม" ของเครื่องโดยตรง (ไม่บังคับกล้อง เหมือนรูปหน้างาน PM)
+            };
+
+            document.getElementById('profile-photo-input').onchange = async (e) => {
+                const file = e.target.files && e.target.files[0];
+                if (!file) return;
+                try {
+                    const preview = await readFileAsDataUrl(file);
+                    document.getElementById('profile-photo-preview').src = preview; // โชว์พรีวิวก่อนอัปโหลดจริง
+                    const url = await uploadUserPhoto(file);
+                    await fetch(SCRIPT_URL, {
+                        method: 'POST',
+                        body: JSON.stringify({ action: 'user_edit', userId: currentUser.userId, photo: url }),
+                        headers: { "Content-Type": "text/plain;charset=utf-8" }
+                    });
+                    currentUser.photo = url;
+                    localStorage.setItem('current_user', JSON.stringify(currentUser));
+                    document.getElementById('profile-photo-preview').src = url;
+                    Toast.fire({ icon: 'success', title: 'เปลี่ยนรูปโปรไฟล์แล้ว' });
+                } catch (err) {
+                    Swal.fire({ icon: 'error', title: 'เปลี่ยนรูปไม่สำเร็จ', text: err.message });
+                } finally {
+                    e.target.value = ''; // เคลียร์ไว้เผื่อเลือกไฟล์เดิมซ้ำได้อีกครั้ง
+                }
+            };
+
+            document.getElementById('profile-open-edit-btn').onclick = () => {
+                openUserProfileEditModal();
+            };
+        }
+    });
+}
+
+// ฟอร์มแก้ไขข้อมูลโปรไฟล์ (แยกจากบัตรพนักงานที่โชว์ด้านนอก เพื่อให้บัตรดูสะอาดสวยงาม)
+function openUserProfileEditModal() {
+    const birthVal = currentUser.birthdate ? new Date(currentUser.birthdate).toISOString().split('T')[0] : '';
+
+    Swal.fire({
+        title: '<i class="fas fa-pen" style="color:#1b4332;"></i> แก้ไขข้อมูลส่วนตัว',
+        html: `
+            <div style="text-align:left;">
+                <div style="font-size:11px; font-weight:800; color:#1b4332; text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid #eef2f0;">
+                    <i class="fas fa-id-card"></i> ข้อมูลส่วนตัว
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                    <div>
+                        <label style="font-size:12px; font-weight:700;">ชื่อ-สกุล</label>
+                        <input id="profile-name" class="swal2-input" style="margin:4px 0 0; width:100%; height:38px;" value="${escapeHtml(currentUser.name)}">
+                    </div>
+                    <div>
+                        <label style="font-size:12px; font-weight:700;">ตำแหน่ง</label>
+                        <input id="profile-position" class="swal2-input" style="margin:4px 0 0; width:100%; height:38px;" value="${escapeHtml(currentUser.position || '')}">
+                    </div>
+                    <div>
+                        <label style="font-size:12px; font-weight:700;">เพศ</label>
+                        <select id="profile-gender" class="swal2-select" style="margin:4px 0 0; width:100%; height:38px;">
+                            <option value="ชาย" ${currentUser.gender === 'ชาย' ? 'selected' : ''}>ชาย</option>
+                            <option value="หญิง" ${currentUser.gender === 'หญิง' ? 'selected' : ''}>หญิง</option>
+                            <option value="อื่นๆ" ${currentUser.gender === 'อื่นๆ' ? 'selected' : ''}>อื่นๆ</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:12px; font-weight:700;">วันเกิด</label>
+                        <input type="date" id="profile-birthdate" class="swal2-input" style="margin:4px 0 0; width:100%; height:38px;" value="${birthVal}">
+                    </div>
+                </div>
+            </div>
+            <div id="profile-age-display" style="margin-top:8px; font-size:12px; color:#64748b; text-align:left;">อายุ: ${calculateAgeJS(birthVal) ?? '-'} ปี (คำนวณอัตโนมัติจากวันเกิดที่กรอกด้านบน)</div>
+            <hr style="margin:14px 0; border-color:#e2e8f0;">
+            <div style="text-align:left;">
+                <div style="font-size:11px; font-weight:800; color:#c2410c; text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px;">
+                    <i class="fas fa-lock"></i> เปลี่ยนรหัสผ่าน (เว้นว่างไว้ถ้าไม่ต้องการเปลี่ยน)
+                </div>
+                <input type="password" id="profile-current-pw" class="swal2-input" placeholder="รหัสผ่านปัจจุบัน" style="margin:0 0 8px; width:100%; height:38px;" autocomplete="current-password">
+                <input type="password" id="profile-new-pw" class="swal2-input" placeholder="รหัสผ่านใหม่" style="margin:0; width:100%; height:38px;" autocomplete="new-password">
+            </div>
+        `,
+        width: '480px',
+        showCancelButton: true,
+        confirmButtonText: 'บันทึก',
+        confirmButtonColor: '#1b4332',
+        cancelButtonText: 'ยกเลิก',
+        didOpen: () => {
+            document.getElementById('profile-birthdate').addEventListener('change', (e) => {
+                document.getElementById('profile-age-display').innerText = `อายุ: ${calculateAgeJS(e.target.value) ?? '-'} ปี (คำนวณอัตโนมัติจากวันเกิด)`;
+            });
+        },
+        preConfirm: () => {
+            const newPw = document.getElementById('profile-new-pw').value;
+            const curPw = document.getElementById('profile-current-pw').value;
+            if (newPw && !curPw) {
+                Swal.showValidationMessage('กรุณากรอกรหัสผ่านปัจจุบัน เพื่อยืนยันก่อนเปลี่ยนรหัสผ่านใหม่');
+                return false;
+            }
+            return {
+                name: document.getElementById('profile-name').value.trim(),
+                position: document.getElementById('profile-position').value.trim(),
+                gender: document.getElementById('profile-gender').value,
+                birthdate: document.getElementById('profile-birthdate').value,
+                currentPassword: curPw,
+                newPassword: newPw
+            };
+        }
+    }).then(async (result) => {
+        if (!result.isConfirmed) { openUserProfileModal(); return; } // ยกเลิก -> กลับไปโชว์บัตรเหมือนเดิม
+        try {
+            const response = await fetch(SCRIPT_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'user_edit', userId: currentUser.userId, ...result.value }),
+                headers: { "Content-Type": "text/plain;charset=utf-8" }
+            });
+            const res = await response.json();
+            if (res.status !== 'success') throw new Error(res.message || 'บันทึกไม่สำเร็จ');
+
+            currentUser.name = result.value.name;
+            currentUser.position = result.value.position;
+            currentUser.gender = result.value.gender;
+            currentUser.birthdate = result.value.birthdate;
+            currentUser.age = calculateAgeJS(result.value.birthdate);
+            localStorage.setItem('current_user', JSON.stringify(currentUser));
+            updateUserProfileIcon();
+            Toast.fire({ icon: 'success', title: 'บันทึกโปรไฟล์เรียบร้อย' });
+            openUserProfileModal(); // กลับไปโชว์บัตรที่อัปเดตแล้ว
+        } catch (err) {
+            Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: err.message });
+        }
+    });
+}
+
+/* =========================================================================================
+   Admin: จัดการผู้ใช้งาน
+========================================================================================= */
+
+async function openUserManagement() {
+    if (!isAdmin) { Swal.fire({ icon: 'warning', title: 'สิทธิ์ไม่เพียงพอ', text: 'กรุณาล็อกอินเป็น Admin ก่อน' }); return; }
+
+    Swal.fire({ title: 'กำลังโหลด...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    let users = [];
+    try {
+        const res = await fetch(SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'user_list', adminPassword: adminPasswordCache }),
+            headers: { "Content-Type": "text/plain;charset=utf-8" }
+        });
+        const result = await res.json();
+        if (result.status !== 'success') throw new Error(result.message);
+        users = result.users || [];
+    } catch (e) {
+        Swal.fire('Error', e.message || 'โหลดรายชื่อผู้ใช้ไม่สำเร็จ', 'error');
+        return;
+    }
+
+    const rowsHtml = users.map(u => `
+        <tr style="border-bottom:1px solid #f1f5f9;">
+            <td style="padding:8px;"><img src="${u.photo || 'https://placehold.co/32x32?text=%20'}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;background:#eee;"></td>
+            <td style="padding:8px; text-align:left; font-size:13px;">
+                <b>${escapeHtml(u.name)}</b> <span style="font-size:10px; color:#1b4332; background:#e8f5e9; padding:1px 6px; border-radius:999px; font-family:monospace;">@${escapeHtml(u.username)}</span> ${u.status === 'Inactive' ? '<span style="color:#94a3b8;font-size:10px;">(ปิดใช้งาน)</span>' : ''}<br>
+                <small style="color:#94a3b8;">${escapeHtml(u.position || '-')} · ${u.age ?? '-'} ปี</small>
+            </td>
+            <td style="padding:8px; white-space:nowrap;">
+                <button onclick="resetUserPassword('${u.userId}','${escapeHtml(u.name)}')" title="สุ่มรหัสผ่านใหม่" style="font-size:11px; padding:5px 7px; border-radius:5px; border:none; background:#f39c12; color:#fff; cursor:pointer; margin-right:3px;"><i class="fas fa-key"></i></button>
+                <button onclick="deleteUserConfirm('${u.userId}','${escapeHtml(u.name)}')" title="ลบผู้ใช้" style="font-size:11px; padding:5px 7px; border-radius:5px; border:none; background:#e74c3c; color:#fff; cursor:pointer;"><i class="fas fa-trash"></i></button>
+            </td>
+        </tr>
+    `).join('');
+
+    Swal.fire({
+        title: `<i class="fas fa-users-gear" style="color:#1b4332;"></i> จัดการผู้ใช้งาน`,
+        html: `
+            <div style="text-align:left; font-size:11px; color:#94a3b8; margin-bottom:10px;">
+                ผู้ใช้ทั้งหมด ${users.length} คน &nbsp;·&nbsp;
+                <i class="fas fa-key" style="color:#f39c12;"></i> สุ่มรหัสผ่านใหม่ &nbsp;
+                <i class="fas fa-trash" style="color:#e74c3c;"></i> ลบผู้ใช้
+            </div>
+            <button onclick="addUserModal()" style="width:100%; background:#27ae60; color:#fff; border:none; padding:10px; border-radius:8px; font-weight:700; margin-bottom:12px; cursor:pointer;">
+                <i class="fas fa-user-plus"></i> เพิ่มผู้ใช้ใหม่
+            </button>
+            <div style="max-height:340px; overflow-y:auto; text-align:left;">
+                <table style="width:100%; font-size:13px; border-collapse:collapse;">${rowsHtml || '<tr><td style="padding:20px; color:#94a3b8;">ยังไม่มีผู้ใช้ในระบบ</td></tr>'}</table>
+            </div>
+        `,
+        width: '480px',
+        showConfirmButton: false,
+        showCloseButton: true
+    });
+}
+
+async function addUserModal() {
+    const result = await Swal.fire({
+        title: '<i class="fas fa-user-plus" style="color:#27ae60;"></i> เพิ่มผู้ใช้ใหม่',
+        html: `
+            <div style="text-align:left;">
+                <div style="margin-bottom:14px;">
+                    <div style="font-size:11px; font-weight:800; color:#1b4332; text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid #eef2f0;">
+                        <i class="fas fa-key"></i> ข้อมูลสำหรับเข้าสู่ระบบ
+                    </div>
+                    <label style="font-size:12px; font-weight:700; color:#555;">Username (สำหรับ login เท่านั้น)</label>
+                    <input id="nu-username" class="swal2-input" style="width:100%; height:38px; margin:4px 0 0;" autocomplete="off" placeholder="เช่น somchai01">
+                </div>
+
+                <div>
+                    <div style="font-size:11px; font-weight:800; color:#1b4332; text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid #eef2f0;">
+                        <i class="fas fa-id-card"></i> ข้อมูลส่วนตัว
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                        <div style="grid-column:span 2;">
+                            <label style="font-size:12px; font-weight:700; color:#555;">ชื่อ-สกุล</label>
+                            <input id="nu-name" class="swal2-input" style="width:100%; height:38px; margin:4px 0 0;" placeholder="เช่น สมชาย ใจดี">
+                        </div>
+                        <div style="grid-column:span 2;">
+                            <label style="font-size:12px; font-weight:700; color:#555;">ตำแหน่ง</label>
+                            <input id="nu-position" class="swal2-input" style="width:100%; height:38px; margin:4px 0 0;" placeholder="เช่น ช่างเทคนิค">
+                        </div>
+                        <div>
+                            <label style="font-size:12px; font-weight:700; color:#555;">เพศ</label>
+                            <select id="nu-gender" class="swal2-select" style="width:100%; height:38px; margin:4px 0 0;">
+                                <option value="ชาย">ชาย</option>
+                                <option value="หญิง">หญิง</option>
+                                <option value="อื่นๆ">อื่นๆ</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-size:12px; font-weight:700; color:#555;">วันเกิด</label>
+                            <input type="date" id="nu-birthdate" class="swal2-input" style="width:100%; height:38px; margin:4px 0 0;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `,
+        width: '460px',
+        confirmButtonText: 'เพิ่มผู้ใช้ (สุ่มรหัสผ่านให้)',
+        confirmButtonColor: '#1b4332',
+        showCancelButton: true,
+        cancelButtonText: 'ยกเลิก',
+        preConfirm: () => {
+            const username = document.getElementById('nu-username').value.trim();
+            const name = document.getElementById('nu-name').value.trim();
+            if (!username) { Swal.showValidationMessage('กรุณากรอก Username สำหรับ login'); return false; }
+            if (!name) { Swal.showValidationMessage('กรุณากรอกชื่อ-สกุล'); return false; }
+            return {
+                username,
+                name,
+                position: document.getElementById('nu-position').value.trim(),
+                gender: document.getElementById('nu-gender').value,
+                birthdate: document.getElementById('nu-birthdate').value
+            };
+        }
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+        const res = await fetch(SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'user_add', adminPassword: adminPasswordCache, ...result.value }),
+            headers: { "Content-Type": "text/plain;charset=utf-8" }
+        });
+        const data = await res.json();
+        if (data.status !== 'success') throw new Error(data.message);
+
+        await Swal.fire({
+            icon: 'success',
+            title: 'เพิ่มผู้ใช้เรียบร้อย',
+            html: `รหัสผ่านที่สุ่มให้:<br><b style="font-size:22px; letter-spacing:2px; color:#1b4332;">${escapeHtml(data.generatedPassword)}</b><br><br><small style="color:#94a3b8;">กรุณาคัดลอกไปให้ผู้ใช้คนนี้ทันที ระบบจะไม่แสดงรหัสนี้ซ้ำอีก</small>`,
+            confirmButtonText: 'รับทราบ',
+            confirmButtonColor: '#1b4332'
+        });
+        openUserManagement();
+    } catch (e) {
+        Swal.fire('Error', e.message || 'เพิ่มผู้ใช้ไม่สำเร็จ', 'error');
+    }
+}
+
+async function resetUserPassword(userId, name) {
+    const confirmReset = await Swal.fire({
+        icon: 'question',
+        title: `สุ่มรหัสผ่านใหม่ให้ ${name}?`,
+        text: 'รหัสผ่านเดิมจะใช้ไม่ได้ทันที',
+        showCancelButton: true,
+        confirmButtonText: 'ยืนยัน',
+        confirmButtonColor: '#f39c12',
+        cancelButtonText: 'ยกเลิก'
+    });
+    if (!confirmReset.isConfirmed) return;
+
+    try {
+        const res = await fetch(SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'user_reset_password', adminPassword: adminPasswordCache, userId }),
+            headers: { "Content-Type": "text/plain;charset=utf-8" }
+        });
+        const data = await res.json();
+        if (data.status !== 'success') throw new Error(data.message);
+
+        await Swal.fire({
+            icon: 'success',
+            title: 'สุ่มรหัสผ่านใหม่แล้ว',
+            html: `รหัสผ่านใหม่ของ <b>${escapeHtml(name)}</b>:<br><b style="font-size:22px; letter-spacing:2px; color:#1b4332;">${escapeHtml(data.generatedPassword)}</b>`,
+            confirmButtonText: 'รับทราบ',
+            confirmButtonColor: '#1b4332'
+        });
+    } catch (e) {
+        Swal.fire('Error', e.message || 'สุ่มรหัสผ่านไม่สำเร็จ', 'error');
+    }
+}
+
+async function deleteUserConfirm(userId, name) {
+    const confirmDel = await Swal.fire({
+        icon: 'warning',
+        title: `ลบผู้ใช้ ${name}?`,
+        text: 'ข้อมูลของผู้ใช้นี้จะถูกลบออกจากระบบทันที (ประวัติ PM ที่บันทึกไปแล้วจะยังอยู่)',
+        showCancelButton: true,
+        confirmButtonText: 'ลบเลย',
+        confirmButtonColor: '#e74c3c',
+        cancelButtonText: 'ยกเลิก'
+    });
+    if (!confirmDel.isConfirmed) return;
+
+    try {
+        const res = await fetch(SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'user_delete', adminPassword: adminPasswordCache, userId }),
+            headers: { "Content-Type": "text/plain;charset=utf-8" }
+        });
+        const data = await res.json();
+        if (data.status !== 'success') throw new Error(data.message);
+        Toast.fire({ icon: 'success', title: 'ลบผู้ใช้เรียบร้อย' });
+        openUserManagement();
+    } catch (e) {
+        Swal.fire('Error', e.message || 'ลบผู้ใช้ไม่สำเร็จ', 'error');
+    }
+}
+
+/* =========================================================================================
+   Admin: Dashboard สรุปจำนวนครั้งที่เข้า PM ต่อคน
+========================================================================================= */
+
+let pmDashboardChart = null;
+
+async function openPmDashboard() {
+    if (!isAdmin) { Swal.fire({ icon: 'warning', title: 'สิทธิ์ไม่เพียงพอ', text: 'กรุณาล็อกอินเป็น Admin ก่อน' }); return; }
+
+    Swal.fire({ title: 'กำลังโหลดข้อมูล...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    let records = [];
+    try {
+        const response = await fetch(SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'pm_stats' }),
+            headers: { "Content-Type": "text/plain;charset=utf-8" }
+        });
+        const result = await response.json();
+        records = result.records || [];
+    } catch (e) {
+        Swal.fire('Error', 'โหลดข้อมูลไม่สำเร็จ', 'error');
+        return;
+    }
+
+    const currentYear = new Date().getFullYear();
+    const years = [...new Set(records.map(r => r.year))];
+    if (!years.includes(currentYear)) years.push(currentYear);
+    years.sort((a, b) => b - a);
+
+    const monthNames = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+
+    Swal.fire({
+        title: 'แดชบอร์ด PM รายบุคคล',
+        html: `
+            <div style="display:flex; gap:8px; margin-bottom:14px; justify-content:center; flex-wrap:wrap;">
+                <select id="dash-year" class="swal2-select" style="height:36px; margin:0;">
+                    ${years.map(y => `<option value="${y}" ${y === currentYear ? 'selected' : ''}>ปี ${y}</option>`).join('')}
+                </select>
+                <select id="dash-mode" class="swal2-select" style="height:36px; margin:0;">
+                    <option value="year">รวมทั้งปี</option>
+                    <option value="month">รายเดือน</option>
+                </select>
+                <select id="dash-month" class="swal2-select" style="height:36px; margin:0; display:none;">
+                    ${monthNames.map((m, i) => `<option value="${i + 1}">${m}</option>`).join('')}
+                </select>
+            </div>
+            <div id="dash-empty" style="display:none; color:#94a3b8; padding:40px 0;">ไม่มีข้อมูลในช่วงที่เลือก</div>
+            <div style="height:280px;"><canvas id="dash-chart"></canvas></div>
+        `,
+        width: '600px',
+        showConfirmButton: false,
+        showCloseButton: true,
+        didOpen: () => {
+            const renderChart = () => {
+                const year = parseInt(document.getElementById('dash-year').value);
+                const mode = document.getElementById('dash-mode').value;
+                const month = parseInt(document.getElementById('dash-month').value || '1');
+
+                const filtered = records.filter(r => r.year === year && (mode === 'year' || r.month === month));
+                const counts = {};
+                filtered.forEach(r => { counts[r.tech] = (counts[r.tech] || 0) + 1; });
+                const labels = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+                const chartData = labels.map(l => counts[l]);
+
+                document.getElementById('dash-empty').style.display = labels.length === 0 ? 'block' : 'none';
+                document.getElementById('dash-chart').style.display = labels.length === 0 ? 'none' : 'block';
+
+                if (pmDashboardChart) pmDashboardChart.destroy();
+                if (labels.length === 0) return;
+
+                pmDashboardChart = new Chart(document.getElementById('dash-chart'), {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{ label: 'จำนวนครั้งที่เข้า PM', data: chartData, backgroundColor: '#2d6a4f', borderRadius: 6 }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: { x: { ticks: { stepSize: 1 } } }
+                    }
+                });
+            };
+
+            document.getElementById('dash-mode').onchange = (e) => {
+                document.getElementById('dash-month').style.display = e.target.value === 'month' ? 'inline-block' : 'none';
+                renderChart();
+            };
+            document.getElementById('dash-year').onchange = renderChart;
+            document.getElementById('dash-month').onchange = renderChart;
+            renderChart();
+        },
+        willClose: () => {
+            if (pmDashboardChart) { pmDashboardChart.destroy(); pmDashboardChart = null; }
+        }
+    });
+}
+
+updateUserProfileIcon();
 loadFromCache();
 loadData();
 
@@ -613,6 +1227,10 @@ function resizeImageDataUrl(dataUrl, maxWidth = 800, quality = 0.6) {
 
 // ฟังก์ชันกลางสำหรับย่อรูป+ส่งขึ้น Drive ใช้ร่วมกันทั้งจากกล้องในแอปและ fallback file picker
 async function uploadImageForStep(sn, pmStep, rawDataUrlOrFile) {
+    if (!currentUser) {
+        Swal.fire({ icon: 'warning', title: 'ต้องเข้าสู่ระบบก่อน', text: 'กรุณาเข้าสู่ระบบก่อนอัปโหลดรูป' });
+        return;
+    }
     Swal.fire({ title: 'กำลังอัปโหลด...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
     try {
         const rawDataUrl = (rawDataUrlOrFile instanceof File)
@@ -656,6 +1274,20 @@ async function uploadPhotoByStep(sn, pmStep, input) {
 
 // --- กล้องถ่ายรูปในแอป (แก้ปัญหา capture="environment" ของ input file ไม่เสถียรบน Android บางเครื่อง) ---
 async function capturePhotoForStep(sn, pmStep) {
+    if (!currentUser) {
+        const doLogin = await Swal.fire({
+            icon: 'info',
+            title: 'ต้องเข้าสู่ระบบก่อน',
+            text: 'กรุณาเข้าสู่ระบบก่อนแนบรูปหน้างาน เพื่อระบุตัวผู้ปฏิบัติงานให้ถูกต้อง',
+            showCancelButton: true,
+            confirmButtonText: 'เข้าสู่ระบบ',
+            confirmButtonColor: '#1b4332',
+            cancelButtonText: 'ยกเลิก'
+        });
+        if (doLogin.isConfirmed) await showLoginModal();
+        return;
+    }
+
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         // เบราว์เซอร์นี้ไม่รองรับกล้องในเว็บ -> fallback ไปใช้ file picker ปกติทันที
         document.getElementById(`img-${sn}-${pmStep}`).click();
