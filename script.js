@@ -65,14 +65,19 @@ function loadFromCache() {
             appData = JSON.parse(cached);
             render();
             document.getElementById('loading').style.display = 'none';
+            return true; // มี cache ให้แสดงแล้ว — ใช้บอก loadData() ว่าไม่ต้องโชว์ loader ซ้ำตอนโหลดจริงตามมา
         }
     } catch (e) {
         console.error("Load cache error:", e);
     }
+    return false;
 }
 
-async function loadData(silent = false) {
-    if (!silent) {
+// skipLoader = true: ใช้ตอนเปิดแอปครั้งแรกที่ loadFromCache() แสดงข้อมูลเก่าให้เห็นไปแล้ว จะได้ไม่ต้องกระพริบ
+// loader เต็มจอซ้ำอีกรอบระหว่างรอข้อมูลจริงจาก Sheets (เดิมกระพริบทุกครั้งที่เปิดแอปทั้งที่มี cache อยู่แล้ว)
+// ไม่กระทบ checkNotice() ซึ่งยังทำงานตามปกติ (อิง silent เท่านั้น) เพราะอยากให้แจ้งเตือนเสียงตอนเปิดแอปเหมือนเดิม
+async function loadData(silent = false, skipLoader = false) {
+    if (!silent && !skipLoader) {
         document.getElementById('refreshIcon').classList.add('fa-spin');
         document.getElementById('loading').style.display = 'block';
     }
@@ -87,7 +92,7 @@ async function loadData(silent = false) {
         if (!silent) Swal.fire('Error', 'โหลดข้อมูลไม่สำเร็จ (แสดงข้อมูลล่าสุดที่เคยบันทึกไว้แทน)', 'error');
     }
     finally {
-        if (!silent) {
+        if (!silent && !skipLoader) {
             document.getElementById('refreshIcon').classList.remove('fa-spin');
             document.getElementById('loading').style.display = 'none';
         }
@@ -138,6 +143,12 @@ function playNoticeSound() {
         // เล่น 2 จังหวะ (ติ๊ด-ตึ๊ด)
         play(1000, 0);
         play(1200, 0.15);
+
+        // ปิด AudioContext หลังเสียงเล่นจบ (เสียงจบที่ 0.15+0.1=0.25s เผื่อเวลาไว้หน่อยเป็น 400ms)
+        // เดิมไม่เคยปิดเลย เปิดแอปทิ้งไว้นานๆ แล้วมีรายการเลยกำหนด/ใกล้กำหนดขึ้นมาเรื่อยๆ (เช่น auto-refresh)
+        // จะสร้าง AudioContext ใหม่ทุกครั้งโดยไม่ปิดของเก่า สะสมจนชนขีดจำกัดที่เบราว์เซอร์อนุญาต (เช่น ~6 บน Chrome)
+        // แล้วเสียงแจ้งเตือนจะเงียบไปเฉยๆ โดยไม่มี error ให้เห็น
+        setTimeout(() => { audioCtx.close().catch(() => {}); }, 400);
 
     } catch (e) {
         console.log("Audio play error:", e);
@@ -194,6 +205,11 @@ function toDriveImageUrl(url) {
 
 function render() {
     const main = document.getElementById('serviceList');
+    // จำไว้ก่อนล้าง DOM ว่าการ์ดไหนกำลังกางรายละเอียดอยู่ + ตำแหน่งสกรอลปัจจุบัน — เพราะ render() ถูกเรียกซ้ำ
+    // ทุกครั้งหลังบันทึกข้อมูลสำเร็จ (ผ่าน loadData(true)) ถ้าไม่จำไว้ การ์ดที่เพิ่งเปิดดู/กำลังกรอกอยู่จะปิดตัวเอง
+    // และหน้าจอเด้งกลับไปบนสุดทุกครั้งที่ติ๊กเช็ค PM หรืออัปโหลดรูป ทั้งที่ผู้ใช้ยังทำงานกับการ์ดนั้นอยู่
+    const openSns = Array.from(main.querySelectorAll('.detail-mode.show')).map(el => el.id.replace('detail-', ''));
+    const scrollY = window.scrollY;
     main.innerHTML = '';
     const now = new Date();
     const limit = new Date(); limit.setDate(now.getDate() + 7);
@@ -260,8 +276,8 @@ function render() {
                             <div style="font-size: 11px; color: var(--text-sub);">แผน: ${pDate.toLocaleDateString('en-GB')}</div>
                             ${isDone ? `<div style="font-size: 11px; color: var(--success); font-weight: bold;"><i class="fas fa-check-circle"></i> เข้าจริง: ${actualDate}</div>` : ''}
                             ${isDone && techVal ? `<div style="font-size: 11px; color: var(--text-sub);"><i class="fas fa-user"></i> ผู้ปฏิบัติงาน: ${escapeHtml(techVal)}</div>` : ''}
-                            ${photoUrl ? `<a href="${photoUrl}" target="_blank" style="color:var(--secondary); font-size:11px; text-decoration:none; margin-top:3px; display:inline-block;"><i class="fas fa-image"></i> ดูรูปงาน</a>` : ''} 
-                            ${gpsVal && gpsVal !== 'No GPS' ? `<a href="${gpsVal}" target="_blank" style="color:#4285F4; font-size:11px; text-decoration:none; margin-top:3px; margin-left:8px; display:inline-block;"><i class="fas fa-map-marker-alt"></i> ดูตำแหน่ง GPS</a>` : ''}
+                            ${photoUrl ? `<a href="${escapeHtml(photoUrl)}" target="_blank" style="color:var(--secondary); font-size:11px; text-decoration:none; margin-top:3px; display:inline-block;"><i class="fas fa-image"></i> ดูรูปงาน</a>` : ''}
+                            ${gpsVal && gpsVal !== 'No GPS' ? `<a href="${escapeHtml(gpsVal)}" target="_blank" style="color:#4285F4; font-size:11px; text-decoration:none; margin-top:3px; margin-left:8px; display:inline-block;"><i class="fas fa-map-marker-alt"></i> ดูตำแหน่ง GPS</a>` : ''}
                             ${isLocked ? `<div style="font-size:11px; color:#94a3b8; margin-top:4px;"><i class="fas fa-circle-info"></i> ต้องปิดงาน PM${idx - 1} ให้เสร็จก่อน จึงจะบันทึกรอบนี้ได้</div>` : ''}
                             ${!isDone && !isLocked ? `
                                 <div style="margin-top:5px;">
@@ -337,6 +353,15 @@ function render() {
         main.appendChild(card);
     });
     runFilters();
+
+    // คืนสถานะการ์ดที่เปิดค้างไว้ก่อนหน้า + ตำแหน่งสกรอล กลับมาเหมือนเดิมหลังสร้าง DOM ใหม่เสร็จ
+    openSns.forEach((sn) => {
+        const el = document.getElementById(`detail-${sn}`);
+        const btn = document.getElementById(`btn-${sn}`);
+        if (el) el.classList.add('show');
+        if (btn) btn.innerHTML = '<i class="fas fa-chevron-up"></i> ปิดรายละเอียด';
+    });
+    window.scrollTo(0, scrollY);
 }
 
 function toggleDetail(sn) {
@@ -603,7 +628,10 @@ function runFilters() {
         if (hasOverdue) cO++;
         if (hasUrgent) cU++;
 
-        const text = card.innerText.toLowerCase();
+        // ใช้ textContent แทน innerText — innerText ต้องคำนวณ layout/สไตล์จริงของ DOM ก่อนถึงจะอ่านค่าได้
+        // (forced synchronous reflow) ส่วน textContent อ่านจากโครงสร้าง DOM ตรงๆ ไม่ต้องรอ layout เลย
+        // ผลลัพธ์ข้อความที่ได้เหมือนกันในเคสนี้ (ไม่มีการซ่อนข้อความด้วย CSS ในการ์ด) แต่เร็วกว่ามากเวลามีหลายสิบการ์ด
+        const text = card.textContent.toLowerCase();
         const matchSearch = text.includes(q);
         const matchMode = (currentMode === 'all') ||
             (currentMode === 'overdue' && hasOverdue) ||
@@ -1546,8 +1574,8 @@ async function openPmDashboard() {
 }
 
 updateUserProfileIcon();
-loadFromCache();
-loadData();
+const hasCachedData = loadFromCache();
+loadData(false, hasCachedData);
 
 // อ่านไฟล์เป็น Data URL (ใช้กับ fallback file input)
 function readFileAsDataUrl(file) {

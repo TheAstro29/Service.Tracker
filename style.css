@@ -768,7 +768,10 @@ input:checked + .compact-slider:before {
 .step-info { flex: 1; min-width: 0; }
 
 /* --- Note / Actions --- */
-textarea {
+/* :not(.swal2-textarea) กันไว้ล่วงหน้า — เจอบั๊กแบบนี้มาแล้วในแอปพี่น้อง (Panolyzer): กฎ tag ธรรมดาแบบนี้
+   ไปทับสไตล์ของ SweetAlert2 เองได้ถ้าใครในทีมเผลอเพิ่ม Swal.fire({ input: 'textarea', ... }) ในอนาคต
+   เพราะกฎนี้ยึด width:100% เต็มกล่อง popup แบบไม่หัก margin ของตัว textarea ออก ทำให้ล้นขอบ popup */
+textarea:not(.swal2-textarea) {
     width: 100%;
     border-radius: var(--r-md);
     border: 1.5px solid var(--border);
@@ -781,7 +784,7 @@ textarea {
     background: var(--bg);
 }
 
-textarea:focus {
+textarea:not(.swal2-textarea):focus {
     outline: none;
     border-color: var(--secondary-light);
     background: #fff;
