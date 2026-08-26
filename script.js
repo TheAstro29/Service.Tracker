@@ -1,6 +1,27 @@
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwTreMfsLHYUq7TEW8nu7brQKyuLL-ALyRRa4pdzNFopY-TlRg4UXo3Ei4AVLk-KOv0/exec?app=service";
+// สำคัญ: ต้องมี "?app=service" ต่อท้ายเสมอ เพราะโปรเจกต์ Apps Script นี้ใช้ไฟล์ Code.gs ไฟล์เดียว
+// รวม Panolyzer Management + Service Tracker ไว้ด้วยกัน แล้วใช้ query นี้แยกว่า request มาจากแอปไหน
+// (ไม่มี ?app= หรือค่าอื่น = ถือเป็น Panolyzer Management ตามพฤติกรรมเดิม)
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzVzNPx9iTSbJwdaYH3YSNRuyaMgXel40oWfDlzY8KlMLXG2X5-1X63A9QBgF8JDD-z/exec?app=service";
 let appData = [];
 let currentMode = 'all';
+
+// เก็บ cache ประวัติอะไหล่ที่เปลี่ยนของแต่ละเครื่อง โครงสร้าง: { [sn]: { PM1:[{name,qty,note,tech,logId}], PM2:[...], PM3:[...] } }
+// โหลดแบบ lazy (เฉพาะตอนเปิดดูรายละเอียดเครื่องนั้นครั้งแรก) เพื่อไม่ต้องแก้ endpoint หลักที่โหลดข้อมูลทั้งหมด
+let partsCache = {};
+
+// รายการอะไหล่ที่พบบ่อยสำหรับ dropdown — ยังไม่เคยมีการบันทึกจริงมาก่อน จึงเปิดกว้างไว้ก่อนด้วยตัวเลือก "อื่นๆ (ระบุเอง)"
+// ค่อยขยายรายการนี้ภายหลังตามอะไหล่ที่ช่างพิมพ์เองบ่อยๆ ในสนามจริง
+const COMMON_PARTS = [
+    'เซนเซอร์วัดความชื้น',
+    'หลอดไฟ LED ภายในเครื่อง',
+    'ฟิวส์ / ฟิวส์กันไฟกระชาก',
+    'พัดลมระบายความร้อน',
+    'สายไฟ',
+    'สาย VGA',
+    'สาย LAN',
+    'สาย hdmi',
+    'สาย USB',
+];
 
 // Toast แจ้งเตือนเล็กๆ มุมขวาบน ใช้แทน popup เต็มจอเวลาบันทึกสำเร็จ (ไม่บล็อกการใช้งานต่อ)
 const Toast = Swal.mixin({
@@ -264,6 +285,17 @@ function render() {
 
             const checkboxTitle = isLocked ? `ต้องปิดงาน PM${idx - 1} ให้เสร็จก่อน` : (needsPhoto ? 'ต้องแนบรูปหน้างานก่อน' : '');
 
+            // กล่องอะไหล่ที่เปลี่ยน + ปุ่มออกใบยืนยันงาน — ไม่แสดงถ้ารอบนี้ยังถูกล็อกอยู่ (ยังไม่ถึงคิว)
+            const stepExtras = !isLocked ? `
+                            <div class="parts-box">
+                                <div class="parts-label"><i class="fas fa-toolbox"></i> อะไหล่ที่เปลี่ยน (รอบนี้)</div>
+                                <div class="chip-row" id="parts-chips-${sn}-PM${idx}">${buildPartsChipsHtml(sn, 'PM' + idx)}</div>
+                                <div class="empty-note" id="parts-empty-${sn}-PM${idx}" style="${(partsCache[sn] && partsCache[sn]['PM' + idx] && partsCache[sn]['PM' + idx].length) ? 'display:none;' : ''}">ยังไม่มีการบันทึกอะไหล่ในรอบนี้</div>
+                                <button type="button" class="add-part-btn" onclick="openAddPartForm('${sn}', 'PM${idx}')"><i class="fas fa-plus"></i> เพิ่มอะไหล่</button>
+                            </div>
+                            ${isDone ? `<button type="button" class="btn-slip" onclick="printServiceSlip('${sn}', ${idx})"><i class="fas fa-file-invoice"></i> ออกใบยืนยันงานให้ลูกค้า</button>` : ''}
+            ` : '';
+
             stepsHTML += `
                     <div class="pm-step ${stepState}">
                         <input type="checkbox" onchange="handleCheck(this,'${sn}','PM${idx}')" ${isDone ? 'checked disabled' : ''} ${(isLocked || needsPhoto) ? 'disabled' : ''} title="${checkboxTitle}">
@@ -286,7 +318,8 @@ function render() {
                                     </button>
                                     <input type="file" id="img-${sn}-PM${idx}" accept="image/*" capture="environment" style="display:none" onchange="uploadPhotoByStep('${sn}', 'PM${idx}', this)">
                                 </div>
-                            ` : ''} 
+                            ` : ''}
+                            ${stepExtras}
                         </div>
                     </div>`;
 
@@ -371,6 +404,262 @@ function toggleDetail(sn) {
     btn.innerHTML = el.classList.contains('show')
         ? '<i class="fas fa-chevron-up"></i> ปิดรายละเอียด'
         : '<i class="fas fa-chevron-down"></i> ดูรายละเอียดและบันทึก';
+
+    // โหลดประวัติอะไหล่แบบ lazy — เฉพาะตอนเปิดดูรายละเอียดครั้งแรกของเครื่องนั้น เพื่อไม่ต้องรวมข้อมูลนี้เข้าไปใน endpoint หลัก
+    if (el.classList.contains('show') && !partsCache[sn]) {
+        loadPartsForMachine(sn);
+    }
+}
+
+// --- ระบบบันทึกอะไหล่ที่เปลี่ยนระหว่างเข้า PM ---
+
+function buildPartsChipsHtml(sn, stepKey) {
+    const list = (partsCache[sn] && partsCache[sn][stepKey]) || [];
+    return list.map(p => `
+        <span class="chip">${escapeHtml(p.name)} <span class="qty">x${escapeHtml(p.qty || 1)}</span>${isAdmin ? `<button type="button" title="ลบรายการนี้" onclick="deletePart('${sn}','${stepKey}','${escapeHtml(p.logId || '')}')">✕</button>` : ''}</span>
+    `).join('');
+}
+
+async function loadPartsForMachine(sn) {
+    try {
+        const res = await fetch(SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'get_pm_parts', sn: sn }),
+            headers: { "Content-Type": "text/plain;charset=utf-8" }
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            partsCache[sn] = data.parts || { PM1: [], PM2: [], PM3: [] };
+            renderPartsChips(sn);
+        }
+    } catch (e) {
+        console.error("Load PM parts error:", e);
+        // ไม่ต้องแจ้งเตือนผู้ใช้ — ถือเป็น enhancement เสริม ไม่ให้บล็อกการใช้งานหลักถ้าดึงไม่สำเร็จ
+    }
+}
+
+// อัปเดตเฉพาะกล่องรายการอะไหล่ในการ์ดที่เปิดอยู่ (ไม่เรียก render() เต็มรูปแบบ กันปัญหาการ์ดพับ/เลื่อนจอกลับ)
+function renderPartsChips(sn) {
+    [1, 2, 3].forEach(idx => {
+        const stepKey = 'PM' + idx;
+        const chipsEl = document.getElementById(`parts-chips-${sn}-${stepKey}`);
+        const emptyEl = document.getElementById(`parts-empty-${sn}-${stepKey}`);
+        if (!chipsEl) return; // รอบนี้อาจถูกล็อกอยู่ จึงไม่มีกล่องอะไหล่แสดง
+        chipsEl.innerHTML = buildPartsChipsHtml(sn, stepKey);
+        const hasParts = (partsCache[sn] && partsCache[sn][stepKey] && partsCache[sn][stepKey].length);
+        if (emptyEl) emptyEl.style.display = hasParts ? 'none' : '';
+    });
+}
+
+async function openAddPartForm(sn, stepKey) {
+    if (!currentUser) {
+        const doLogin = await Swal.fire({
+            icon: 'info',
+            title: 'ต้องเข้าสู่ระบบก่อน',
+            text: 'กรุณาเข้าสู่ระบบก่อน จึงจะบันทึกอะไหล่ที่เปลี่ยนได้ (เพื่อระบุตัวผู้บันทึกให้ถูกต้อง)',
+            showCancelButton: true,
+            confirmButtonText: 'เข้าสู่ระบบ',
+            confirmButtonColor: '#1b4332',
+            cancelButtonText: 'ยกเลิก'
+        });
+        if (doLogin.isConfirmed) await showLoginModal();
+        return;
+    }
+
+    const optionsHtml = COMMON_PARTS.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('')
+        + `<option value="__other__">อื่นๆ (ระบุเอง)</option>`;
+
+    const { value: formValues } = await Swal.fire({
+        title: 'บันทึกอะไหล่ที่เปลี่ยน',
+        html: `
+            <div style="text-align:left;">
+                <label style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">รายการอะไหล่</label>
+                <select id="part-select" class="swal2-input" style="margin:4px 0 10px; width:100%;">
+                    <option value="">— เลือกอะไหล่ —</option>
+                    ${optionsHtml}
+                </select>
+                <div id="part-other-wrap" style="display:none;">
+                    <label style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">ระบุชื่ออะไหล่</label>
+                    <input id="part-other" class="swal2-input" style="margin:4px 0 10px; width:100%;" placeholder="พิมพ์ชื่ออะไหล่">
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <div style="flex:1;">
+                        <label style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">หมายเหตุ (ถ้ามี)</label>
+                        <input id="part-note" class="swal2-input" style="margin:4px 0 0; width:100%;" placeholder="เช่น ตำแหน่งที่เปลี่ยน">
+                    </div>
+                    <div style="flex:0 0 90px;">
+                        <label style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">จำนวน</label>
+                        <input id="part-qty" type="number" min="1" value="1" class="swal2-input" style="margin:4px 0 0; width:100%;">
+                    </div>
+                </div>
+            </div>
+        `,
+        didOpen: () => {
+            document.getElementById('part-select').addEventListener('change', (e) => {
+                document.getElementById('part-other-wrap').style.display = e.target.value === '__other__' ? 'block' : 'none';
+            });
+        },
+        confirmButtonText: 'บันทึก',
+        confirmButtonColor: '#1b4332',
+        showCancelButton: true,
+        cancelButtonText: 'ยกเลิก',
+        preConfirm: () => {
+            const sel = document.getElementById('part-select').value;
+            const other = document.getElementById('part-other').value.trim();
+            const name = sel === '__other__' ? other : sel;
+            const qty = parseInt(document.getElementById('part-qty').value, 10) || 1;
+            const note = document.getElementById('part-note').value.trim();
+            if (!name) {
+                Swal.showValidationMessage('กรุณาเลือกหรือระบุชื่ออะไหล่');
+                return false;
+            }
+            return { name, qty, note };
+        }
+    });
+
+    if (!formValues) return;
+
+    Swal.fire({ title: 'กำลังบันทึก...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+    try {
+        const res = await fetch(SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'log_pm_part',
+                sn: sn,
+                pmStep: stepKey,
+                partName: formValues.name,
+                qty: formValues.qty,
+                note: formValues.note,
+                techName: currentUser.name,
+                logTime: new Date().toISOString()
+            }),
+            headers: { "Content-Type": "text/plain;charset=utf-8" }
+        });
+        const data = await res.json();
+        if (data.status !== 'success') throw new Error(data.message || 'บันทึกไม่สำเร็จ');
+
+        if (!partsCache[sn]) partsCache[sn] = { PM1: [], PM2: [], PM3: [] };
+        partsCache[sn][stepKey].push({ name: formValues.name, qty: formValues.qty, note: formValues.note, tech: currentUser.name, logId: data.logId || '' });
+        renderPartsChips(sn);
+
+        Swal.close();
+        Toast.fire({ icon: 'success', title: 'บันทึกอะไหล่สำเร็จ' });
+    } catch (e) {
+        console.error("Log PM part error:", e);
+        Swal.fire('Error', e.message || 'ไม่สามารถบันทึกอะไหล่ได้ กรุณาลองใหม่อีกครั้ง', 'error');
+    }
+}
+
+// ลบรายการอะไหล่ (สำหรับ Admin แก้ไขข้อมูลที่บันทึกผิดเท่านั้น)
+async function deletePart(sn, stepKey, logId) {
+    if (!logId) return;
+    const confirm = await Swal.fire({
+        title: 'ลบรายการอะไหล่นี้?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#e11d48',
+        confirmButtonText: 'ลบ',
+        cancelButtonText: 'ยกเลิก'
+    });
+    if (!confirm.isConfirmed) return;
+
+    try {
+        const res = await fetch(SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'delete_pm_part', logId: logId, adminPassword: adminPasswordCache }),
+            headers: { "Content-Type": "text/plain;charset=utf-8" }
+        });
+        const data = await res.json();
+        if (data.status !== 'success') throw new Error(data.message || 'ลบไม่สำเร็จ');
+
+        partsCache[sn][stepKey] = (partsCache[sn][stepKey] || []).filter(p => p.logId !== logId);
+        renderPartsChips(sn);
+        Toast.fire({ icon: 'success', title: 'ลบรายการแล้ว' });
+    } catch (e) {
+        Swal.fire('Error', e.message || 'ไม่สามารถลบรายการได้', 'error');
+    }
+}
+
+// --- ใบยืนยันงานให้ลูกค้า (ออกทันทีหลังปิดงาน PM แต่ละรอบ) ---
+async function printServiceSlip(sn, idx) {
+    const m = appData.find(x => ((x["S/N Analyzer"] || x["SN"] || x["S/N"] || "").toString().trim()) === sn);
+    if (!m) { Swal.fire('Error', 'ไม่พบข้อมูลเครื่องนี้', 'error'); return; }
+
+    // ให้แน่ใจว่ามีข้อมูลอะไหล่ก่อนออกใบยืนยัน (เผื่อผู้ใช้ยังไม่เคยกางรายละเอียดเครื่องนี้มาก่อน)
+    if (!partsCache[sn]) {
+        Swal.fire({ title: 'กำลังเตรียมใบยืนยันงาน...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+        await loadPartsForMachine(sn);
+        Swal.close();
+    }
+
+    const client = m["ชื่อลูกค้า"] || m["Client name"] || "ไม่ระบุชื่อ";
+    const location = m["จังหวัด"] || m["Location"] || "ไม่ระบุจังหวัด";
+    const modelVal = m["Model"] || "-";
+    const stepKey = 'PM' + idx;
+    const actualDateVal = m[`${stepKey}_Status`];
+    const actualDate = actualDateVal ? formatThaiDate(actualDateVal) : '-';
+    const techVal = m[`${stepKey}_Tech`] || '-';
+    const gpsVal = m[`${stepKey}_GPS`];
+    const photoUrl = m[`${stepKey}_Photo`];
+    const parts = (partsCache[sn] && partsCache[sn][stepKey]) || [];
+
+    const partsRows = parts.length
+        ? parts.map(p => `<tr><td>${escapeHtml(p.name)}</td><td>${escapeHtml(p.qty || 1)}</td><td>${escapeHtml(p.note || '-')}</td></tr>`).join('')
+        : `<tr><td colspan="3" style="text-align:center; color:#999;">ไม่มีการเปลี่ยนอะไหล่ในรอบนี้</td></tr>`;
+
+    const container = document.getElementById('printReportArea');
+    container.innerHTML = `
+        <div class="print-page">
+            <div class="print-header">
+                <img src="icons/icon-512.png" class="print-logo">
+                <div>
+                    <div class="print-title">C2TECH Service Tracker</div>
+                    <div class="print-subtitle">ใบยืนยันการเข้าบริการ (Service Confirmation)</div>
+                </div>
+            </div>
+            <div class="print-meta">
+                ออกเอกสารเมื่อ: ${formatThaiDate(new Date())}
+            </div>
+
+            <div class="print-section-title">ข้อมูลลูกค้า / เครื่อง</div>
+            <table class="print-table">
+                <tbody>
+                    <tr><td style="font-weight:700; width:35%;">ชื่อลูกค้า</td><td>${escapeHtml(client)}</td></tr>
+                    <tr><td style="font-weight:700;">สถานที่</td><td>${escapeHtml(location)}</td></tr>
+                    <tr><td style="font-weight:700;">S/N เครื่อง</td><td>${escapeHtml(sn)}</td></tr>
+                    <tr><td style="font-weight:700;">รุ่นเครื่อง</td><td>${escapeHtml(modelVal)}</td></tr>
+                </tbody>
+            </table>
+
+            <div class="print-section-title">รายละเอียดการเข้าบริการ — PM รอบที่ ${idx}</div>
+            <table class="print-table">
+                <tbody>
+                    <tr><td style="font-weight:700; width:35%;">วันที่เข้าบริการ</td><td>${actualDate}</td></tr>
+                    <tr><td style="font-weight:700;">ผู้ปฏิบัติงาน</td><td>${escapeHtml(techVal)}</td></tr>
+                    <tr><td style="font-weight:700;">ตำแหน่งที่ปฏิบัติงาน</td><td>${gpsVal && gpsVal !== 'No GPS' ? 'บันทึกพิกัด GPS แล้ว' : '-'}</td></tr>
+                </tbody>
+            </table>
+
+            <div class="print-section-title">อะไหล่ที่เปลี่ยนในรอบนี้</div>
+            <table class="print-table">
+                <thead><tr><th>รายการ</th><th>จำนวน</th><th>หมายเหตุ</th></tr></thead>
+                <tbody>${partsRows}</tbody>
+            </table>
+
+            ${photoUrl ? `
+            <div class="print-section-title">รูปภาพหน้างาน</div>
+            <img src="${escapeHtml(toDriveImageUrl(photoUrl))}" style="max-width:260px; border-radius:8px; border:1.5px solid #e2e8f0;">
+            ` : ''}
+
+            <div class="print-signature">
+                <div><div class="print-sign-line"></div><div class="print-sign-label">ผู้ปฏิบัติงาน (ช่าง)</div></div>
+                <div><div class="print-sign-line"></div><div class="print-sign-label">ลูกค้าผู้รับบริการ</div></div>
+            </div>
+        </div>
+    `;
+
+    setTimeout(() => window.print(), 250);
 }
 
 // ดึงพิกัด GPS จริงจากเบราว์เซอร์ แปลงเป็นลิงก์ Google Maps ให้กดดูตำแหน่งได้ทันที
