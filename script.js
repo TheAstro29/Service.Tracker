@@ -19,8 +19,8 @@ const COMMON_PARTS = [
     'สายไฟ',
     'สาย VGA',
     'สาย LAN',
-    'สาย hdmi',
-    'สาย USB',
+    'สาย HDMI',
+    'สาย USB'
 ];
 
 // Toast แจ้งเตือนเล็กๆ มุมขวาบน ใช้แทน popup เต็มจอเวลาบันทึกสำเร็จ (ไม่บล็อกการใช้งานต่อ)
@@ -293,7 +293,7 @@ function render() {
                                 <div class="empty-note" id="parts-empty-${sn}-PM${idx}" style="${(partsCache[sn] && partsCache[sn]['PM' + idx] && partsCache[sn]['PM' + idx].length) ? 'display:none;' : ''}">ยังไม่มีการบันทึกอะไหล่ในรอบนี้</div>
                                 <button type="button" class="add-part-btn" onclick="openAddPartForm('${sn}', 'PM${idx}')"><i class="fas fa-plus"></i> เพิ่มอะไหล่</button>
                             </div>
-                            ${isDone ? `<button type="button" class="btn-slip" onclick="printServiceSlip('${sn}', ${idx})"><i class="fas fa-file-invoice"></i> ออกใบยืนยันงานให้ลูกค้า</button>` : ''}
+                            ${isDone ? `<button type="button" class="btn-slip" onclick="printServiceSlip('${sn}', ${idx})"><i class="fab fa-line"></i> สร้างรูปยืนยันงานส่ง LINE</button>` : ''}
             ` : '';
 
             stepsHTML += `
@@ -581,21 +581,21 @@ async function deletePart(sn, stepKey, logId) {
     }
 }
 
-// --- ใบยืนยันงานให้ลูกค้า (ออกทันทีหลังปิดงาน PM แต่ละรอบ) ---
+// --- ใบยืนยันงานให้ลูกค้า: สร้างเป็นรูปภาพสำหรับส่ง LINE (เดิมเป็นเอกสารพิมพ์ เปลี่ยนเพราะช่างหน้างานไม่สะดวกปริ้น) ---
+// ใช้เทคนิคเดียวกับปุ่ม "สร้างรูปสำหรับ LINE" ในหน้ารายงานสรุปของ Admin (renderLineImageReport ด้านล่าง)
 async function printServiceSlip(sn, idx) {
     const m = appData.find(x => ((x["S/N Analyzer"] || x["SN"] || x["S/N"] || "").toString().trim()) === sn);
     if (!m) { Swal.fire('Error', 'ไม่พบข้อมูลเครื่องนี้', 'error'); return; }
 
-    // ให้แน่ใจว่ามีข้อมูลอะไหล่ก่อนออกใบยืนยัน (เผื่อผู้ใช้ยังไม่เคยกางรายละเอียดเครื่องนี้มาก่อน)
+    Swal.fire({ title: 'กำลังสร้างรูปภาพ...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+    // ให้แน่ใจว่ามีข้อมูลอะไหล่ก่อนสร้างรูป (เผื่อผู้ใช้ยังไม่เคยกางรายละเอียดเครื่องนี้มาก่อน)
     if (!partsCache[sn]) {
-        Swal.fire({ title: 'กำลังเตรียมใบยืนยันงาน...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
         await loadPartsForMachine(sn);
-        Swal.close();
     }
 
     const client = m["ชื่อลูกค้า"] || m["Client name"] || "ไม่ระบุชื่อ";
     const location = m["จังหวัด"] || m["Location"] || "ไม่ระบุจังหวัด";
-    const modelVal = m["Model"] || "-";
     const stepKey = 'PM' + idx;
     const actualDateVal = m[`${stepKey}_Status`];
     const actualDate = actualDateVal ? formatThaiDate(actualDateVal) : '-';
@@ -604,62 +604,104 @@ async function printServiceSlip(sn, idx) {
     const photoUrl = m[`${stepKey}_Photo`];
     const parts = (partsCache[sn] && partsCache[sn][stepKey]) || [];
 
-    const partsRows = parts.length
-        ? parts.map(p => `<tr><td>${escapeHtml(p.name)}</td><td>${escapeHtml(p.qty || 1)}</td><td>${escapeHtml(p.note || '-')}</td></tr>`).join('')
-        : `<tr><td colspan="3" style="text-align:center; color:#999;">ไม่มีการเปลี่ยนอะไหล่ในรอบนี้</td></tr>`;
+    const partsHtml = parts.length
+        ? parts.map(p => `<span style="display:inline-block; background:rgba(255,183,3,.18); color:#ffb703; font-size:11px; font-weight:700; padding:4px 10px; border-radius:999px; margin:0 6px 6px 0;">${escapeHtml(p.name)} x${escapeHtml(p.qty || 1)}</span>`).join('')
+        : `<span style="font-size:11px; opacity:.6;">ไม่มีการเปลี่ยนอะไหล่ในรอบนี้</span>`;
 
-    const container = document.getElementById('printReportArea');
-    container.innerHTML = `
-        <div class="print-page">
-            <div class="print-header">
-                <img src="icons/icon-512.png" class="print-logo">
-                <div>
-                    <div class="print-title">C2TECH Service Tracker</div>
-                    <div class="print-subtitle">ใบยืนยันการเข้าบริการ (Service Confirmation)</div>
-                </div>
-            </div>
-            <div class="print-meta">
-                ออกเอกสารเมื่อ: ${formatThaiDate(new Date())}
-            </div>
+    // ลองโหลดรูปหน้างานเข้ามาก่อน (เผื่อโหลดไม่สำเร็จ เช่น ติด policy การแชร์ไฟล์ของ Google Workspace)
+    // ถ้าโหลดไม่ได้ จะไม่ทำให้สร้างรูปทั้งใบพัง แค่ขึ้นข้อความแทนตำแหน่งรูปนั้นแทน
+    let photoHtml = '';
+    if (photoUrl) {
+        const imgOk = await new Promise((resolve) => {
+            const testImg = new Image();
+            testImg.crossOrigin = 'anonymous';
+            testImg.onload = () => resolve(true);
+            testImg.onerror = () => resolve(false);
+            testImg.src = toDriveImageUrl(photoUrl);
+            setTimeout(() => resolve(false), 6000); // กันรอนานเกินไปถ้าเน็ตช้า/โหลดค้าง
+        });
+        photoHtml = imgOk
+            ? `<div style="margin-top:10px; border-radius:12px; overflow:hidden;"><img crossorigin="anonymous" src="${escapeHtml(toDriveImageUrl(photoUrl))}" style="width:100%; display:block;"></div>`
+            : `<div style="margin-top:10px; background:rgba(255,255,255,.08); border-radius:14px; padding:14px; text-align:center; font-size:11px; opacity:.7;"><i class="fas fa-image"></i> มีรูปหน้างานแนบในระบบ</div>`;
+    }
 
-            <div class="print-section-title">ข้อมูลลูกค้า / เครื่อง</div>
-            <table class="print-table">
-                <tbody>
-                    <tr><td style="font-weight:700; width:35%;">ชื่อลูกค้า</td><td>${escapeHtml(client)}</td></tr>
-                    <tr><td style="font-weight:700;">สถานที่</td><td>${escapeHtml(location)}</td></tr>
-                    <tr><td style="font-weight:700;">S/N เครื่อง</td><td>${escapeHtml(sn)}</td></tr>
-                    <tr><td style="font-weight:700;">รุ่นเครื่อง</td><td>${escapeHtml(modelVal)}</td></tr>
-                </tbody>
-            </table>
+    const slipRow = (label, value) => `
+        <div style="display:flex; justify-content:space-between; gap:12px; font-size:12px; padding:4px 0; border-bottom:1px solid rgba(255,255,255,.08);">
+            <span style="opacity:.65;">${escapeHtml(label)}</span>
+            <span style="font-weight:700; text-align:right;">${escapeHtml(value)}</span>
+        </div>`;
 
-            <div class="print-section-title">รายละเอียดการเข้าบริการ — PM รอบที่ ${idx}</div>
-            <table class="print-table">
-                <tbody>
-                    <tr><td style="font-weight:700; width:35%;">วันที่เข้าบริการ</td><td>${actualDate}</td></tr>
-                    <tr><td style="font-weight:700;">ผู้ปฏิบัติงาน</td><td>${escapeHtml(techVal)}</td></tr>
-                    <tr><td style="font-weight:700;">ตำแหน่งที่ปฏิบัติงาน</td><td>${gpsVal && gpsVal !== 'No GPS' ? 'บันทึกพิกัด GPS แล้ว' : '-'}</td></tr>
-                </tbody>
-            </table>
-
-            <div class="print-section-title">อะไหล่ที่เปลี่ยนในรอบนี้</div>
-            <table class="print-table">
-                <thead><tr><th>รายการ</th><th>จำนวน</th><th>หมายเหตุ</th></tr></thead>
-                <tbody>${partsRows}</tbody>
-            </table>
-
-            ${photoUrl ? `
-            <div class="print-section-title">รูปภาพหน้างาน</div>
-            <img src="${escapeHtml(toDriveImageUrl(photoUrl))}" style="max-width:260px; border-radius:8px; border:1.5px solid #e2e8f0;">
-            ` : ''}
-
-            <div class="print-signature">
-                <div><div class="print-sign-line"></div><div class="print-sign-label">ผู้ปฏิบัติงาน (ช่าง)</div></div>
-                <div><div class="print-sign-line"></div><div class="print-sign-label">ลูกค้าผู้รับบริการ</div></div>
-            </div>
+    const card = document.createElement('div');
+    card.style.cssText = "width:380px; padding:26px 22px; background:linear-gradient(160deg,#1b4332,#0d2a1f); font-family:'Sarabun',sans-serif; color:#fff; position:fixed; left:-9999px; top:0;";
+    card.innerHTML = `
+        <div style="text-align:center; margin-bottom:16px;">
+            <img src="icons/icon-512.png" style="width:52px; height:52px; border-radius:14px;">
+            <div style="font-size:15px; font-weight:800; margin-top:8px;">C2TECH SERVICE TRACKER</div>
+            <div style="font-size:11px; opacity:.7; margin-top:2px;">ใบยืนยันการเข้าบริการ</div>
+            <div style="display:inline-block; background:rgba(255,255,255,.12); border-radius:999px; padding:4px 14px; font-size:11px; font-weight:700; margin-top:10px;">PM รอบที่ ${idx}</div>
         </div>
+        <div style="background:rgba(255,255,255,.08); border-radius:14px; padding:14px 16px;">
+            ${slipRow('ลูกค้า', client)}
+            ${slipRow('สถานที่', location)}
+            ${slipRow('S/N เครื่อง', sn)}
+            ${slipRow('วันที่เข้าบริการ', actualDate)}
+            ${slipRow('ผู้ปฏิบัติงาน', techVal)}
+            ${slipRow('ตำแหน่งที่ปฏิบัติงาน', (gpsVal && gpsVal !== 'No GPS') ? '📍 บันทึก GPS แล้ว' : '-')}
+        </div>
+        <div style="background:rgba(255,255,255,.08); border-radius:14px; padding:14px 16px; margin-top:10px;">
+            <div style="font-size:11px; opacity:.65; margin-bottom:6px;">อะไหล่ที่เปลี่ยนในรอบนี้</div>
+            ${partsHtml}
+        </div>
+        ${photoHtml}
+        <div style="text-align:center; margin-top:16px; font-size:10.5px; opacity:.6;">ยืนยันโดย ${escapeHtml(techVal)} · ${formatThaiDate(new Date())}</div>
     `;
+    document.body.appendChild(card);
 
-    setTimeout(() => window.print(), 250);
+    html2canvas(card, { scale: 2, useCORS: true }).then(canvas => {
+        document.body.removeChild(card);
+
+        canvas.toBlob((blob) => {
+            const fileName = `service_slip_${sn}_PM${idx}.png`;
+            const imgUrl = canvas.toDataURL('image/png');
+            const file = blob ? new File([blob], fileName, { type: 'image/png' }) : null;
+            const canShareFile = !!(navigator.canShare && file && navigator.canShare({ files: [file] }));
+
+            // แสดงตัวอย่างรูปให้ดูก่อนเสมอ — ไม่แชร์ทันทีโดยไม่ให้ดูก่อน
+            // ถ้าเครื่องรองรับการแชร์ไฟล์ (Android/iOS รุ่นใหม่) จะมีปุ่ม "แชร์ไป LINE" เพิ่มมาให้เลือก
+            Swal.fire({
+                title: 'รูปยืนยันงานสำหรับส่ง LINE',
+                html: `<img src="${imgUrl}" style="width:100%; border-radius:12px; box-shadow:0 4px 14px rgba(0,0,0,0.15);">`,
+                confirmButtonText: canShareFile ? '<i class="fab fa-line"></i> แชร์ไป LINE' : '<i class="fas fa-download"></i> ดาวน์โหลดรูป',
+                confirmButtonColor: '#06C755',
+                showDenyButton: canShareFile,
+                denyButtonText: '<i class="fas fa-download"></i> ดาวน์โหลด',
+                denyButtonColor: '#1b4332',
+                showCancelButton: true,
+                cancelButtonText: 'ปิด'
+            }).then(async (result) => {
+                if (result.isConfirmed && canShareFile) {
+                    // ผู้ใช้ดูตัวอย่างแล้วกด "แชร์ไป LINE" — ค่อยเปิด share sheet ตอนนี้ (ต้องกดปุ่มเองเสมอ ตาม policy ของเบราว์เซอร์)
+                    try {
+                        await navigator.share({
+                            files: [file],
+                            title: 'ใบยืนยันการเข้าบริการ',
+                            text: `ใบยืนยันการเข้าบริการ PM รอบที่ ${idx} — ${client}`
+                        });
+                    } catch (shareErr) {
+                        // ผู้ใช้กดยกเลิกใน share sheet เอง — ไม่ต้องแจ้ง error
+                    }
+                } else if ((result.isConfirmed && !canShareFile) || result.isDenied) {
+                    const link = document.createElement('a');
+                    link.href = imgUrl;
+                    link.download = fileName;
+                    link.click();
+                }
+            });
+        }, 'image/png');
+    }).catch(err => {
+        document.body.removeChild(card);
+        Swal.fire('Error', 'สร้างรูปภาพไม่สำเร็จ: ' + err.message, 'error');
+    });
 }
 
 // ดึงพิกัด GPS จริงจากเบราว์เซอร์ แปลงเป็นลิงก์ Google Maps ให้กดดูตำแหน่งได้ทันที
