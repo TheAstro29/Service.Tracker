@@ -3,8 +3,8 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#1b4332">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#22392b">
     <title>Service Tracker by C2TECH</title>
 
     <!-- โลโก้ / ไอคอนสำหรับ Add to Home Screen -->
@@ -22,120 +22,121 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap"
-        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <link rel="stylesheet" href="style.css" />
-
+    <link rel="stylesheet" href="style.css?v=20261028g" />
 </head>
 
 <body>
 
-    <div class="sticky-wrapper">
-        <div class="header-top">
-            <div class="brand">
-                <img src="icons/icon-512.png" alt="C2TECH" class="brand-logo">
-                <h1>Service Tracker</h1>
+    <!-- ===== หัวแอป + ตัวเลขสรุป ===== -->
+    <header class="st-top">
+        <div class="st-top-row">
+            <div class="st-brand">
+                <img src="icons/icon-192.png" alt="C2TECH Service" class="st-logo">
+                <div><h1>Service Tracker</h1><span>C2TECH · PM ANALYZER</span></div>
             </div>
-            <div class="header-actions">
-                <i class="fas fa-user-circle admin-login-btn" id="userProfileIcon" onclick="openUserProfileOrLogin()" title="เข้าสู่ระบบ / โปรไฟล์"></i>
-                <i class="fas fa-toolbox admin-login-btn" id="adminMenuIcon" onclick="openAdminMenu()" title="เมนู Admin" style="display:none;"></i>
-                <i class="fas fa-lock admin-login-btn" id="lockIcon" onclick="adminAuth()" title="Admin Login"></i>
-                <button class="btn-refresh" onclick="loadData()">
-                    <i class="fas fa-sync-alt" id="refreshIcon"></i> รีเฟรช
+            <div class="st-actions">
+                <button type="button" class="st-refresh" onclick="loadData()" title="โหลดข้อมูลล่าสุด">
+                    <i class="fas fa-rotate" id="refreshIcon"></i><span id="stUpdated">รีเฟรช</span>
                 </button>
+                <button type="button" class="st-user" onclick="openUserProfileOrLogin()" aria-haspopup="menu"></button>
             </div>
         </div>
+    </header>
 
-        <div class="filter-group">
-            <div id="f-overdue" class="f-card" onclick="smartToggle('overdue')">
-                <span id="cnt-overdue" class="val">0</span>
-                <span class="lab"><i class="fas fa-circle-exclamation"></i> เลยกำหนด</span>
-            </div>
-            <div id="f-urgent" class="f-card" onclick="smartToggle('urgent')">
-                <span id="cnt-urgent" class="val">0</span>
-                <span class="lab"><i class="fas fa-clock"></i> ใกล้กำหนด</span>
-            </div>
-            <div id="f-all" class="f-card active-all" onclick="smartToggle('all')">
-                <span id="cnt-all" class="val">0</span>
-                <span class="lab"><i class="fas fa-layer-group"></i> ทั้งหมด</span>
-            </div>
-        </div>
-
-        <div class="search-container">
-            <div class="search-box">
-                <i class="fas fa-search" style="color:var(--primary)"></i>
-                <input type="text" id="mainSearch" placeholder="ค้นหาชื่อ, S/N, หรือจังหวัด..." onkeyup="debouncedRunFilters()">
-            </div>
-        </div>
-
-        <div class="search-container" style="margin-top: 10px; display: flex; justify-content: center;">
-            <div class="toolbar-row">
-
-                <button class="btn-clear" onclick="clearAllFilters()">
-                    <i class="fas fa-eraser"></i> ล้างการกรอง
-                </button>
-
-                <!-- ตัวกรอง Type (Lab / Real-time) -->
-                <select id="typeFilter" class="chip-select" onchange="runFilters()">
-                    <option value="all">Type ทั้งหมด</option>
-                    <option value="Lab">Lab</option>
-                    <option value="Real-time">Real-time</option>
-                </select>
-
-                <!-- ตัวกรอง Mode (Milled rice / Paddy) -->
-                <select id="modeFilter" class="chip-select" onchange="runFilters()">
-                    <option value="all">Mode ทั้งหมด</option>
-                    <option value="Milled rice">Milled rice</option>
-                    <option value="Paddy">Paddy</option>
-                </select>
-
-                <!-- ปุ่ม RENEW -->
-                <div class="chip-switch">
-                    <span class="chip-label">RENEW</span>
-                    <label class="compact-switch">
-                        <input type="checkbox" id="showRenewOnlySwitch" onchange="runFilters()">
-                        <span class="compact-slider"></span>
-                    </label>
-                </div>
-
-                <!-- ปุ่ม DONE -->
-                <div class="chip-switch">
-                    <span class="chip-label">DONE</span>
-                    <label class="compact-switch">
-                        <input type="checkbox" id="hideCompleteSwitch" onchange="render()">
-                        <span class="compact-slider"></span>
-                    </label>
-                </div>
-
-            </div>
-        </div>
+    <div class="st-kpis" role="tablist" aria-label="กรองตามสถานะ">
+        <button type="button" id="f-overdue" class="f-card k-over" onclick="smartToggle('overdue')"><span id="cnt-overdue" class="val">0</span><span class="lab"><i class="fas fa-circle-exclamation"></i> เลยกำหนด</span></button>
+        <button type="button" id="f-urgent" class="f-card k-urg" onclick="smartToggle('urgent')"><span id="cnt-urgent" class="val">0</span><span class="lab"><i class="fas fa-clock"></i> ใกล้กำหนด 7 วัน</span></button>
+        <button type="button" id="f-plan" class="f-card k-plan" onclick="smartToggle('plan')"><span id="cnt-plan" class="val">0</span><span class="lab"><i class="fas fa-calendar-check"></i> ตามแผน</span></button>
+        <button type="button" id="f-done" class="f-card k-done" onclick="smartToggle('done')"><span id="cnt-done" class="val">0</span><span class="lab"><i class="fas fa-flag-checkered"></i> ครบ 3 รอบ</span></button>
+        <button type="button" id="f-all" class="f-card k-all active-all" onclick="smartToggle('all')"><span id="cnt-all" class="val">0</span><span class="lab"><i class="fas fa-layer-group"></i> ทั้งหมด</span></button>
     </div>
 
+    <!-- ===== ค้นหา + ตัวกรอง (select/checkbox ซ่อนไว้ ใช้ร่วมกับโค้ดเดิม) ===== -->
+    <div class="st-bar">
+        <label class="st-search">
+            <i class="fas fa-search"></i>
+            <input type="search" id="mainSearch" placeholder="ค้นหาลูกค้า S/N หรือจังหวัด" oninput="debouncedRunFilters()" autocomplete="off">
+        </label>
+        <div class="st-chips" id="stChips">
+            <button type="button" class="st-chip" data-f="type:Lab" onclick="stToggleChip('typeFilter','Lab')">Lab</button>
+            <button type="button" class="st-chip" data-f="type:Real-time" onclick="stToggleChip('typeFilter','Real-time')">Real-time</button>
+            <button type="button" class="st-chip" data-f="mode:Milled rice" onclick="stToggleChip('modeFilter','Milled rice')">Milled rice</button>
+            <button type="button" class="st-chip" data-f="mode:Paddy" onclick="stToggleChip('modeFilter','Paddy')">Paddy</button>
+            <button type="button" class="st-chip" data-f="renew" onclick="stToggleSwitch('showRenewOnlySwitch')"><i class="fas fa-star"></i> ต่อรายปี</button>
+            <button type="button" class="st-chip" data-f="hidedone" onclick="stToggleSwitch('hideCompleteSwitch')"><i class="fas fa-eye-slash"></i> ซ่อนที่ครบรอบ</button>
+            <button type="button" class="st-chip st-chip-clear" id="stClear" onclick="clearAllFilters()"><i class="fas fa-xmark"></i> ล้าง</button>
+        </div>
+        <select id="typeFilter" hidden><option value="all">all</option><option value="Lab">Lab</option><option value="Real-time">Real-time</option></select>
+        <select id="modeFilter" hidden><option value="all">all</option><option value="Milled rice">Milled rice</option><option value="Paddy">Paddy</option></select>
+        <input type="checkbox" id="showRenewOnlySwitch" hidden>
+        <input type="checkbox" id="hideCompleteSwitch" hidden>
+    </div>
+
+    <!-- ===== รายการเครื่อง + แผงรายละเอียด ===== -->
+    <div class="st-main">
+        <main id="serviceList" class="st-list" aria-live="polite"></main>
+        <aside class="st-detail-wrap" id="stDetailWrap" aria-label="รายละเอียดเครื่อง">
+            <div class="st-detail" id="stDetail">
+                <div class="st-detail-empty"><i class="fas fa-industry"></i><b>เลือกเครื่องเพื่อดูรายละเอียด</b><span>ดูรอบ PM อะไหล่ และหมายเหตุของเครื่องได้ที่นี่</span></div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- ===== Loading screen ===== -->
     <div id="loading" class="loader-main" style="display: block;">
-        <div class="loader-container">
-            <div class="logo-loader">
-                <div class="logo-ring"></div>
-                <div class="logo-glow"></div>
-                <img src="icons/icon-512.png" alt="C2TECH" class="logo-img">
+        <div class="ld">
+            <div class="ld-orb" aria-hidden="true">
+                <span class="ld-ring"></span><span class="ld-ring r2"></span><span class="ld-arc"></span><span class="ld-arc a2"></span>
+                <span class="ld-grain g1"></span><span class="ld-grain g2"></span><span class="ld-grain g3"></span><span class="ld-grain g4"></span><span class="ld-grain g5"></span>
+                <img src="icons/icon-512.png" alt="" class="ld-logo">
+                <span class="ld-scan"></span>
             </div>
-            <div class="loader-brand">C2TECH <span>SERVICE TRACKER</span></div>
-            <div class="loader-text" id="loaderStatusText">กำลังเชื่อมต่อข้อมูลล่าสุด...</div>
-            <div class="loader-bar-wrapper">
-                <div class="loader-progress-bar"></div>
-            </div>
+            <div class="ld-brand"><b>SERVICE TRACKER</b><span>C2TECH · PM ANALYZER</span></div>
+            <ul class="ld-steps" id="ldSteps">
+                <li data-s="1" class="now"><i></i>เชื่อมต่อเซิร์ฟเวอร์</li>
+                <li data-s="2"><i></i>โหลดข้อมูลเครื่อง</li>
+                <li data-s="3"><i></i>ตรวจรอบ PM ที่ต้องดำเนินการ</li>
+            </ul>
+            <div class="ld-bar"><i id="ldBar"></i></div>
+            <div class="loader-text" id="loaderStatusText"></div>
+            <div class="ld-foot">บริษัท ซีทูเทค จำกัด</div>
         </div>
     </div>
 
-    <div class="container">
-        <main id="serviceList"></main>
+
+    <!-- ===== แจ้งเตือนงาน PM (ตอนเปิดแอป / กดรีเฟรช) — ดู checkNotice() ใน script.js ===== -->
+    <div id="stNotice" class="nt-overlay" hidden>
+        <div class="nt-sheet" role="dialog" aria-modal="true" aria-labelledby="ntTitle">
+            <div class="nt-head" id="ntHead">
+                <span class="nt-grab" aria-hidden="true"></span>
+                <span class="nt-bell" aria-hidden="true"><i class="fas fa-bell"></i></span>
+                <button type="button" class="nt-x" onclick="stNoticeClose()" aria-label="ปิด"><i class="fas fa-xmark"></i></button>
+                <h2 id="ntTitle"></h2>
+                <p id="ntSub"></p>
+            </div>
+            <div class="nt-sum">
+                <button type="button" class="nt-s over" onclick="stNoticeGo('overdue')"><b id="ntOver">0</b><span>เลยกำหนด</span></button>
+                <button type="button" class="nt-s urg" onclick="stNoticeGo('urgent')"><b id="ntUrg">0</b><span>ใกล้กำหนดใน 7 วัน</span></button>
+            </div>
+            <div class="nt-lh"><span>ต้องไปก่อน</span><span>เรียงตามความเร่งด่วน</span></div>
+            <div class="nt-list" id="ntList"></div>
+            <div class="nt-foot">
+                <button type="button" class="nt-btn" onclick="stNoticeClose()">รับทราบ</button>
+                <button type="button" class="nt-btn pri" id="ntPrimary"></button>
+            </div>
+            <label class="nt-mute"><input type="checkbox" id="ntMute"> ไม่ต้องเตือนอีกวันนี้ <span>(ตัวเลขบนหน้าหลักยังแสดงเหมือนเดิม)</span></label>
+        </div>
     </div>
+    <!-- การ์ดแจ้งเตือนเล็ก (มีเครื่องเลยกำหนดเพิ่มระหว่างเปิดแอปค้างไว้) -->
+    <div id="stToast" class="nt-toast" hidden></div>
 
     <div id="printReportArea"></div>
 
-    <script src="script.js"></script>
+    <script src="script.js?v=20261028g"></script>
 </body>
 
 </html>
