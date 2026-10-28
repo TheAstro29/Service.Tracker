@@ -156,7 +156,11 @@ function stSplashFinish() {
     stLoaderStep(4);
     const el = document.getElementById('loading');
     setTimeout(() => { el.classList.add('ld-hide'); }, 300);
-    setTimeout(() => { el.style.display = 'none'; el.classList.remove('ld-hide'); if (stSplashNotice) checkNotice(); }, 800);
+    setTimeout(() => {
+        el.style.display = 'none'; el.classList.remove('ld-hide');
+        if (!stToken) { const u = document.getElementById('lgUser'); if (u && !u.value && window.innerWidth >= 900) u.focus(); return; }
+        if (stSplashNotice) checkNotice();
+    }, 800);
 }
 document.getElementById('loading').addEventListener('click', () => { if (stSplashActive && stSplashReady) stSplashFinish(); });
 
@@ -1071,7 +1075,7 @@ function closeUserMenu() {
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeUserMenu(); });
 
 // ===== หน้าเข้าสู่ระบบ (บังคับก่อนเห็นข้อมูล) =====
-function stShowLogin(msg) {
+function stShowLogin(msg, noFocus) {
     let el = document.getElementById('stLogin');
     if (!el) {
         el = document.createElement('div');
@@ -1096,7 +1100,7 @@ function stShowLogin(msg) {
     el.hidden = false;
     document.body.classList.add('st-login-on');
     stExpiredShown = false;
-    setTimeout(() => { const u = document.getElementById('lgUser'); if (u && !u.value) u.focus(); }, 60);
+    if (!noFocus) setTimeout(() => { const u = document.getElementById('lgUser'); if (u && !u.value) u.focus(); }, 60);
 }
 function stHideLogin() {
     const el = document.getElementById('stLogin');
@@ -1128,10 +1132,12 @@ async function stDoLogin(ev) {
         if (res.status !== 'success' || !res.token) throw new Error(res.message || 'เข้าสู่ระบบไม่สำเร็จ');
         document.getElementById('lgPw').value = '';
         stSaveSession(res.user, res.token);
+        // ลำดับ: หน้าโหลด → เข้าสู่ระบบ → หน้าหลัก — โหลดข้อมูลบนหน้าเข้าสู่ระบบ แล้วค่อยเปิดหน้าหลักทีเดียว
+        btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> กำลังโหลดข้อมูล...';
+        stSplashActive = false;
+        await loadData(false, true);
         stHideLogin();
         Toast.fire({ icon: 'success', title: `ยินดีต้อนรับ ${currentUser.name}` });
-        stSplashActive = false;
-        loadData(false, false);
     } catch (e) {
         err.hidden = false;
         err.innerText = e.message === 'Failed to fetch' ? 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่' : e.message;
@@ -2844,11 +2850,17 @@ if (stToken) {
     loadData(false, hasCachedData);
     stVerifySession();
 } else {
+    // ยังไม่ได้เข้าระบบ: แสดงหน้าโหลดครบ animation ก่อน แล้วค่อยเปิดหน้าเข้าสู่ระบบ (เตรียมไว้ใต้หน้าโหลด)
     try { localStorage.removeItem(CACHE_KEY); } catch (e) { }
-    stSplashActive = false;
-    document.getElementById('loading').style.display = 'none';
+    const ls = document.querySelectorAll('#ldSteps li');
+    if (ls[1]) ls[1].lastChild.textContent = 'ตรวจสอบบัญชีผู้ใช้';
+    if (ls[2]) ls[2].lastChild.textContent = 'เตรียมหน้าเข้าสู่ระบบ';
     render();
-    stShowLogin();
+    stShowLogin('', true);
+    stLoaderStep(1);
+    stSplashSetReady();
+    document.getElementById('loaderStatusText').innerText = '';
+    stSplashTick();
 }
 
 // อ่านไฟล์เป็น Data URL (ใช้กับ fallback file input)
