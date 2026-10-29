@@ -11,6 +11,25 @@ let partsCache = {};
 
 // รายการอะไหล่ที่พบบ่อยสำหรับ dropdown — ยังไม่เคยมีการบันทึกจริงมาก่อน จึงเปิดกว้างไว้ก่อนด้วยตัวเลือก "อื่นๆ (ระบุเอง)"
 // ค่อยขยายรายการนี้ภายหลังตามอะไหล่ที่ช่างพิมพ์เองบ่อยๆ ในสนามจริง
+// v6 อะไหล่ PM ของ Color Sorter (แยกจาก Panolyzer)
+const SORTER_PARTS = [
+    'Ejector / หัวพ่นลม',
+    'โซลินอยด์วาล์ว',
+    'ไส้กรองลม / ชุดกรองลมดักน้ำ',
+    'หลอดไฟ LED แสงส่องชิ้นงาน',
+    'กระจกหน้ากล้อง / กระจกกันฝุ่น',
+    'ชุดกล้อง / เลนส์',
+    'มอเตอร์สั่น / ชุดป้อนสั่น (Vibrator)',
+    'ราง (Chute)',
+    'พัดลมระบายความร้อน',
+    'ฟิวส์',
+    'สายลม / ข้อต่อลม',
+    'สายไฟ / สาย LAN'
+];
+const KIND_LABEL = { panolyzer: 'Panolyzer', sorter: 'Color Sorter' };
+let stKind = 'all';
+try { const k = localStorage.getItem('c2tech_service_kind'); if (k === 'panolyzer' || k === 'sorter') stKind = k; } catch (e) { }
+let stNoPlanList = [], stShowNoPlan = false;
 const COMMON_PARTS = [
     'เซนเซอร์วัดความชื้น',
     'หลอดไฟ LED ภายในเครื่อง',
@@ -427,7 +446,7 @@ function stDiffDays(d) { return Math.round((stDay0(d) - stDay0(new Date())) / 86
 function stIsWide() { return window.innerWidth >= 1100; }
 
 function stCompute(m) {
-    const sn = (m["S/N Analyzer"] || m["SN"] || m["S/N"] || "").toString().trim();
+    const sn = (m["S/N Analyzer"] || m["S/N Sorter"] || m["SN"] || m["S/N"] || "").toString().trim();
     if (!sn || (m["Status"] || "").toUpperCase() === "TEST") return null;
     const now = new Date();
     const limit = new Date(); limit.setDate(now.getDate() + 7);
@@ -436,7 +455,8 @@ function stCompute(m) {
         sn: sn, raw: m,
         client: m["ชื่อลูกค้า"] || m["Client name"] || "ไม่ระบุชื่อ",
         location: m["จังหวัด"] || m["Location"] || "ไม่ระบุจังหวัด",
-        model: m["Model"] || "-", mode: m["Mode"] || "-", type: m["Type"] || "-",
+        kind: m._kind === 'sorter' ? 'sorter' : 'panolyzer', pmAuto: !!m._pmAuto,
+        model: m["Model"] || "-", mode: m["Mode"] || "-", type: m["Type"] || "-", modelCode: m["Model code"] || "",
         renew: statusYearVal.includes("ต่อรายปี"),
         pm3Done: !!m["PM3_Status"],
         steps: []
@@ -478,14 +498,17 @@ function stCompute(m) {
     } else {
         x.dueLabel = 'ยังไม่มีแผน PM'; x.dueShort = '-'; x.dueSub = ''; x.sortKey = Infinity;
     }
-    x.search = [x.client, x.location, sn, x.model, x.mode, x.type].join(' ').toLowerCase();
+    if (x.kind === 'sorter') { x.mode = '-'; x.type = '-'; } // ตัวกรอง Lab/Real-time/Mode ใช้กับ Panolyzer เท่านั้น
+    x.search = [x.client, x.location, sn, x.model, x.mode, x.type, x.modelCode, KIND_LABEL[x.kind], x.kind === 'sorter' ? 'sorter คัดสี' : ''].join(' ').toLowerCase();
     return x;
 }
 
 function render() {
     const isHideComplete = document.getElementById('hideCompleteSwitch').checked;
     // ซ่อนเครื่องที่ยังไม่มีวันนัด PM เลยสักรอบ (เช่น เครื่องใน stock ยังไม่ได้ติดตั้ง/ยังไม่เริ่มสัญญา)
-    stMachines = appData.map(stCompute).filter(Boolean).filter(x => x.steps.length > 0).filter(x => !(isHideComplete && x.pm3Done));
+    const all = appData.map(stCompute).filter(Boolean);
+    stNoPlanList = all.filter(x => x.steps.length === 0); // v6 เครื่องที่ยังไม่มีวันนัด (Admin ตั้งได้)
+    stMachines = all.filter(x => x.steps.length > 0).filter(x => !(isHideComplete && x.pm3Done));
     runFilters();
     renderDetail();
 }
@@ -500,7 +523,7 @@ function stCardHtml(x) {
         (x.renew ? '<span class="sc-tag star"><i class="fas fa-star"></i> ต่อรายปี</span>' : '');
     const cardCls = x.status === 'overdue' ? 'card-overdue' : x.status === 'urgent' ? 'card-urgent' : x.status === 'done' ? 'card-done' : '';
     return `<button type="button" class="s-card ${cardCls}${x.sn === stSelected ? ' sel' : ''}" data-sn="${escapeHtml(x.sn)}" onclick="toggleDetail(this.dataset.sn)">
-        <div class="sc-name"><b>${stWords(x.client)}</b><span>${escapeHtml(x.location)} · S/N ${escapeHtml(x.sn)}${x.renew ? ' · ★' : ''}</span><div class="sc-tags">${tags}</div></div>
+        <div class="sc-name"><b>${stWords(x.client)}</b><span>${stKind === 'all' || x.kind === 'sorter' ? `<em class="sc-kind k-${x.kind}">${x.kind === 'sorter' ? 'Sorter' : 'Panolyzer'}</em> ` : ''}${escapeHtml(x.location)} · S/N ${escapeHtml(x.sn)}${x.renew ? ' · ★' : ''}</span><div class="sc-tags">${tags}</div></div>
         <div class="sc-trk">${segs}</div>
         <div class="sc-due ${x.status}"><b>${escapeHtml(stIsWide() || window.innerWidth > 860 ? x.dueLabel : x.dueShort)}</b><span>${escapeHtml(x.dueSub)}${!(stIsWide() || window.innerWidth > 860) && x.next ? ' · PM' + x.next.idx : ''}</span></div>
     </button>`;
@@ -539,7 +562,7 @@ function stNeedPhoto(ev) {
 function renderDetail(resetScroll) {
     const box = document.getElementById('stDetail');
     if (!box) return;
-    let x = stMachines.find(m2 => m2.sn === stSelected);
+    let x = stMachines.find(m2 => m2.sn === stSelected) || stNoPlanList.find(m2 => m2.sn === stSelected);
     if (!x && stIsWide()) {
         const firstCard = document.querySelector('#serviceList .s-card');
         if (firstCard) { stSelected = firstCard.dataset.sn; firstCard.classList.add('sel'); x = stMachines.find(m2 => m2.sn === stSelected); }
@@ -591,7 +614,8 @@ function renderDetail(resetScroll) {
                 ${parts}`;
         } else {
             const closeDisabled = st.needsPhoto;
-            body = `<div class="dt-meta"><span>แผน ${stDate(st.planned)}</span>${links}</div>
+            const editDate = isAdmin ? `<button type="button" class="dt-mini" onclick="stSetPmDate('${snJs}', ${st.idx})"><i class="fas fa-pen"></i> แก้วันนัด</button>` : '';
+            body = `<div class="dt-meta"><span>แผน ${stDate(st.planned)}${x.pmAuto && st.idx === 1 ? ' <em class="dt-auto">(นับจากวันส่งมอบ)</em>' : ''}</span>${editDate}${links}</div>
                 <div class="dt-box">
                     <div class="dt-req ${st.photo ? 'ok' : 'todo'}"><i>${st.photo ? '✓' : '1'}</i>แนบรูปหน้างาน<b>${st.photo ? 'แนบแล้ว' : 'ยังไม่มี'}</b></div>
                     <div class="dt-req"><i>2</i>บันทึกอะไหล่ที่เปลี่ยน (ถ้ามี)</div>
@@ -606,7 +630,7 @@ function renderDetail(resetScroll) {
         }
         const kebab = st.done && isAdmin ? `<button type="button" class="dt-kebab" aria-label="เมนู Admin ของ PM${st.idx}" onclick="stStepMenu(event,'${snJs}',${st.idx})"><i class="fas fa-ellipsis"></i></button>` : '';
         return `<div class="dt-step ${cls}"><span class="dt-dot">${st.done ? '✓' : st.idx}</span><h3>PM รอบที่ ${st.idx} ${pill}${kebab}</h3>${body}</div>`;
-    }).join('') || '<p class="dt-meta">ยังไม่มีแผน PM ของเครื่องนี้</p>';
+    }).join('') || `<p class="dt-meta">ยังไม่มีแผน PM ของเครื่องนี้</p>${isAdmin ? `<button type="button" class="dt-btn" onclick="stSetPmDate('${snJs}', 1)"><i class="fas fa-calendar-plus"></i> ตั้งวันนัด PM1</button>` : ''}`;
 
     const renewUI = isAdmin ? `
         <div class="dt-section">
@@ -625,7 +649,9 @@ function renderDetail(resetScroll) {
             ${x.renew ? '<span class="dt-badge"><i class="fas fa-star"></i> ต่อรายปี</span>' : ''}
             <h2>${stWords(x.client)}</h2>
             <div class="dt-sub"><i class="fas fa-location-dot"></i> ${escapeHtml(x.location)} · S/N ${escapeHtml(sn)}</div>
-            <div class="dt-kv"><div><small>Model</small><b>${escapeHtml(x.model)}</b></div><div><small>Type</small><b>${escapeHtml(x.type)}</b></div><div><small>Mode</small><b>${escapeHtml(x.mode)}</b></div></div>
+            ${x.kind === 'sorter'
+            ? `<div class="dt-kv"><div><small>ประเภท</small><b class="kind-sorter-t">Color Sorter</b></div><div><small>Model</small><b>${escapeHtml(x.model)}</b></div><div><small>Model code</small><b>${escapeHtml(x.modelCode || '-')}</b></div><div><small>ส่งมอบ</small><b>${escapeHtml(stDmyText(m["Delivery date"]))}</b></div></div>`
+            : `<div class="dt-kv"><div><small>Model</small><b>${escapeHtml(x.model)}</b></div><div><small>Type</small><b>${escapeHtml(x.type)}</b></div><div><small>Mode</small><b>${escapeHtml(x.mode)}</b></div></div>`}
         </div>
         <div class="dt-body">
             ${canEdit ? '' : '<div class="dt-ro"><i class="fas fa-eye"></i> โหมดดูอย่างเดียว (Guest)</div>'}
@@ -949,14 +975,30 @@ function runFilters() {
     const typeFilterVal = document.getElementById('typeFilter').value;
     const modeFilterVal = document.getElementById('modeFilter').value;
 
-    // ตัวเลขสรุปนับจากทุกเครื่อง (เหมือนเดิม: เครื่องที่มี PM เลยกำหนด/ใกล้กำหนดอย่างน้อย 1 รอบ)
-    document.getElementById('cnt-overdue').innerText = stMachines.filter(x => x.hasOverdue).length;
-    document.getElementById('cnt-urgent').innerText = stMachines.filter(x => x.hasUrgent).length;
-    document.getElementById('cnt-plan').innerText = stMachines.filter(x => x.status === 'plan').length;
-    document.getElementById('cnt-done').innerText = stMachines.filter(x => x.status === 'done').length;
-    document.getElementById('cnt-all').innerText = stMachines.length;
+    // v6 ตัวสลับประเภทเครื่อง (Panolyzer / Color Sorter) — ตัวเลขสรุปนับตามประเภทที่เลือก
+    const kindOk = x => stKind === 'all' || x.kind === stKind;
+    document.querySelectorAll('#stKind button[data-k]').forEach(b => {
+        const k = b.dataset.k;
+        b.classList.toggle('on', k === stKind);
+        b.setAttribute('aria-selected', k === stKind);
+        const n = b.querySelector('.n'); if (n) n.textContent = stMachines.filter(x => k === 'all' || x.kind === k).length;
+    });
+    document.body.classList.toggle('kind-sorter', stKind === 'sorter');
+    const pool = stShowNoPlan ? stNoPlanList.filter(kindOk) : stMachines.filter(kindOk);
+    const noPlanN = stNoPlanList.filter(kindOk).length;
+    const npChip = document.getElementById('stNoPlan');
+    if (npChip) { npChip.hidden = !(isAdmin && (noPlanN || stShowNoPlan)); npChip.classList.toggle('on', stShowNoPlan); npChip.querySelector('.n').textContent = noPlanN; }
 
-    const list = stMachines.filter(x => {
+    // ตัวเลขสรุป: เครื่องที่มี PM เลยกำหนด/ใกล้กำหนดอย่างน้อย 1 รอบ
+    const km = stMachines.filter(kindOk);
+    document.getElementById('cnt-overdue').innerText = km.filter(x => x.hasOverdue).length;
+    document.getElementById('cnt-urgent').innerText = km.filter(x => x.hasUrgent).length;
+    document.getElementById('cnt-plan').innerText = km.filter(x => x.status === 'plan').length;
+    document.getElementById('cnt-done').innerText = km.filter(x => x.status === 'done').length;
+    document.getElementById('cnt-all').innerText = km.length;
+
+    const list = pool.filter(x => {
+        if (stShowNoPlan) return (!q || x.search.includes(q));
         const matchMode = currentMode === 'all' || (currentMode === 'overdue' && x.hasOverdue) || (currentMode === 'urgent' && x.hasUrgent) ||
             (currentMode === 'plan' && x.status === 'plan') || (currentMode === 'done' && x.status === 'done');
         return matchMode && (!q || x.search.includes(q)) && (!isShowRenewOnly || x.renew) &&
@@ -970,7 +1012,7 @@ function runFilters() {
             f.startsWith('type:') ? typeFilterVal === f.slice(5) : f.startsWith('mode:') ? modeFilterVal === f.slice(5) : false;
         c.classList.toggle('on', on);
     });
-    const anyFilter = q || isShowRenewOnly || typeFilterVal !== 'all' || modeFilterVal !== 'all' || currentMode !== 'all' || document.getElementById('hideCompleteSwitch').checked;
+    const anyFilter = q || isShowRenewOnly || typeFilterVal !== 'all' || modeFilterVal !== 'all' || currentMode !== 'all' || document.getElementById('hideCompleteSwitch').checked || stShowNoPlan;
     document.getElementById('stClear').classList.toggle('show', !!anyFilter);
 
     if (!appData.length) {
@@ -979,6 +1021,10 @@ function runFilters() {
     }
     if (!list.length) {
         main.innerHTML = `<div class="st-empty"><i class="fas fa-magnifying-glass"></i><b>ไม่พบเครื่องที่ตรงกับตัวกรอง</b>${anyFilter ? 'ลองล้างตัวกรองหรือเปลี่ยนคำค้นหา' : ''}</div>`;
+        return;
+    }
+    if (stShowNoPlan) {
+        main.innerHTML = `<div class="st-grp noplan">ยังไม่มีวันนัด PM · ${list.length}</div>` + list.map(stCardHtml).join('');
         return;
     }
     const groups = [['overdue', 'เลยกำหนด'], ['urgent', 'ใกล้กำหนด 7 วัน'], ['plan', 'ตามแผน'], ['done', 'ครบ 3 รอบแล้ว']];
@@ -1739,6 +1785,7 @@ function dbEvents() {
 function dbFilterMachine(x, flt) {
     if (!flt || flt === 'all') return true;
     if (flt === 'renew') return x.renew;
+    if (flt === 'panolyzer' || flt === 'sorter') return x.kind === flt; // v6
     return x.type === flt;
 }
 
@@ -1887,7 +1934,7 @@ function dbBarsHtml(buckets, small) {
 
 function dbDonutHtml(ms) {
     const key = dbBreak;
-    const get = x => key === 'type' ? x.type : key === 'mode' ? x.mode : x.location;
+    const get = x => key === 'type' ? (x.kind === 'sorter' ? 'Color Sorter' : x.type) : key === 'mode' ? (x.kind === 'sorter' ? 'Color Sorter' : x.mode) : x.location;
     const cnt = {};
     ms.forEach(x => { const k = get(x) && get(x) !== '-' ? get(x) : 'ไม่ระบุ'; cnt[k] = (cnt[k] || 0) + 1; });
     let rows = Object.entries(cnt).sort((a, b) => b[1] - a[1]);
@@ -1904,7 +1951,7 @@ function dbRender() {
     const el = document.getElementById('dbPage');
     if (!el) return;
     const [from, to] = dbPeriodRange(dbPeriod.key, dbPeriod.from, dbPeriod.to);
-    const R = dbCompute(from, to, 'all');
+    const R = dbCompute(from, to, stKind); // v6 ตามตัวสลับประเภทเครื่อง
     const diff = R.done.length - R.prevDone;
     const maxT = Math.max(1, ...R.techs.map(t => t.count));
     const maxW = Math.max(1, ...R.weeks.map(w => w.total));
@@ -1914,10 +1961,10 @@ function dbRender() {
     el.innerHTML = `
         <header class="um-top">
             <button type="button" class="um-back" onclick="dbClose()"><i class="fas fa-chevron-left"></i> กลับ</button>
-            <div class="um-title"><h2>แดชบอร์ด PM</h2><span>${escapeHtml(dbFmtRange(from, to))} · ${R.machines.length} เครื่อง${upd ? ' · ' + escapeHtml(upd) : ''}</span></div>
+            <div class="um-title"><h2>แดชบอร์ด PM${stKind !== 'all' ? ' · ' + KIND_LABEL[stKind] : ''}</h2><span>${escapeHtml(dbFmtRange(from, to))} · ${R.machines.length} เครื่อง${upd ? ' · ' + escapeHtml(upd) : ''}</span></div>
             <button type="button" class="db-rpbtn" onclick="openReportModal()"><i class="fas fa-file-lines"></i> <span>สร้างรายงาน</span></button>
         </header>
-        <div class="db-bar"><div class="db-seg" role="tablist">${DB_PERIODS.map(([k, l]) => `<button type="button" class="${dbPeriod.key === k ? 'on' : ''}" onclick="dbSetPeriod('${k}')">${l}</button>`).join('')}</div>
+        <div class="db-bar"><div class="db-seg db-kind" role="tablist">${[['all', 'ทุกเครื่อง'], ['panolyzer', 'Panolyzer'], ['sorter', 'Color Sorter']].map(([k, l]) => `<button type="button" class="${stKind === k ? 'on' : ''}" onclick="stSetKind('${k}');dbRender()">${l}</button>`).join('')}</div><div class="db-seg" role="tablist">${DB_PERIODS.map(([k, l]) => `<button type="button" class="${dbPeriod.key === k ? 'on' : ''}" onclick="dbSetPeriod('${k}')">${l}</button>`).join('')}</div>
             ${dbPeriod.key === 'custom' ? `<div class="db-custom"><input type="date" id="dbFrom" value="${dbPeriod.from}" onchange="dbSetCustom()" aria-label="ตั้งแต่"><span>ถึง</span><input type="date" id="dbTo" value="${dbPeriod.to}" onchange="dbSetCustom()" aria-label="ถึง"></div>` : ''}
             ${dbExtra === null ? '<span class="db-hint"><i class="fas fa-circle-notch fa-spin"></i> กำลังรวมประวัติรอบสัญญาก่อน...</span>' : (!R.hasHistory ? '<span class="db-hint warn"><i class="fas fa-circle-info"></i> ยังไม่รวมประวัติรอบสัญญาก่อน (อัปเดต Code.gs เพื่อดูครบ)</span>' : '')}
         </div>
@@ -2040,7 +2087,7 @@ function rpUpdate() {
     document.getElementById('rpFrom').disabled = document.getElementById('rpTo').disabled = rpState.key !== 'custom';
     const cnt = { kpi: '4 ช่อง', tech: R.techs.length + ' คน', overdue: R.overdueAt.length, urgent: R.urgentAt.length, done: R.done.length, parts: dbExtra && dbExtra.ok ? R.parts.length : '…' };
     document.getElementById('rpSecs').innerHTML = RP_SECTIONS.map(([k, l]) => `<label class="rp-ckl"><input type="checkbox" ${rpState.sec[k] ? 'checked' : ''} onchange="rpToggle('${k}')"><i></i><span>${l}</span>${cnt[k] !== undefined ? `<small>${cnt[k]}</small>` : ''}</label>`).join('');
-    document.getElementById('rpFlt').innerHTML = [['all', 'ทุกเครื่อง'], ['Lab', 'Lab'], ['Real-time', 'Real-time'], ['renew', 'ต่อรายปี']].map(([k, l]) => `<button type="button" class="${rpState.flt === k ? 'on' : ''}" onclick="rpSetFlt('${k}')">${l}</button>`).join('');
+    document.getElementById('rpFlt').innerHTML = [['all', 'ทุกเครื่อง'], ['panolyzer', 'Panolyzer'], ['sorter', 'Color Sorter'], ['Lab', 'Lab'], ['Real-time', 'Real-time'], ['renew', 'ต่อรายปี']].map(([k, l]) => `<button type="button" class="${rpState.flt === k ? 'on' : ''}" onclick="rpSetFlt('${k}')">${l}</button>`).join('');
     document.getElementById('rpPaper').innerHTML = rpDocHtml(R);
     document.getElementById('rpPage')._R = R;
     rpFit();
@@ -2055,7 +2102,7 @@ function rpFit() {
 }
 window.addEventListener('resize', () => { const r = document.getElementById('rpPage'); if (r && !r.hidden) rpFit(); });
 
-function rpFltLabel(f) { return f === 'all' ? '' : f === 'renew' ? 'เฉพาะเครื่องต่อรายปี' : 'เฉพาะ ' + f; }
+function rpFltLabel(f) { return f === 'all' ? '' : f === 'renew' ? 'เฉพาะเครื่องต่อรายปี' : 'เฉพาะ ' + (KIND_LABEL[f] || f); }
 
 // เนื้อหารายงาน (ใช้ทั้งตัวอย่างและตอนพิมพ์)
 function rpDocHtml(R) {
@@ -2215,6 +2262,58 @@ function stTimeShort(iso) {
     return diff === 0 ? 'วันนี้ ' + hm : diff === -1 ? 'เมื่อวาน ' + hm : stDate(d);
 }
 function stAddMonths(d, n) { const x = new Date(d); x.setMonth(x.getMonth() + n); return x; }
+// v6 ตัวสลับประเภทเครื่อง
+function stSetKind(k) {
+    stKind = k;
+    try { localStorage.setItem('c2tech_service_kind', k); } catch (e) { }
+    if (k === 'sorter') { document.getElementById('typeFilter').value = 'all'; document.getElementById('modeFilter').value = 'all'; }
+    runFilters();
+    renderDetail();
+}
+function stToggleNoPlan() { stShowNoPlan = !stShowNoPlan; runFilters(); }
+// วันที่จากชีต (Date ISO หรือข้อความ วัน/เดือน/ปี) → ข้อความไทยสั้น
+function stDmyText(v) {
+    if (!v) return '-';
+    const s = String(v).trim();
+    const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    const d = m ? new Date(+m[3] > 2400 ? +m[3] - 543 : +m[3], +m[2] - 1, +m[1]) : new Date(s);
+    return isNaN(d) ? s : stDate(d);
+}
+// v6 Admin แก้วันนัด PM (รอบที่ยังไม่ปิด) — รอบถัดไปที่ยังไม่ปิดเลื่อนตาม +4 เดือน
+async function stSetPmDate(sn, idx) {
+    if (!isAdmin) return;
+    const x = stFindMachine(sn) || stNoPlanList.find(m2 => m2.sn === sn);
+    if (!x) return;
+    const st = x.steps.find(s2 => s2.idx === idx);
+    const cur = st && st.planned ? st.planned : new Date();
+    const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const prev = v => {
+        const d = new Date(v + 'T00:00:00'); if (isNaN(d)) return '';
+        return [idx, idx + 1, idx + 2].filter(n => n <= 3).map((n, k) => { const dd = stAddMonths(d, 4 * k); return `<div><i>${n}</i><span>PM รอบที่ ${n}</span><b>${stDate(dd)}</b></div>`; }).join('');
+    };
+    const r = await Swal.fire({
+        title: st ? `แก้วันนัด PM${idx}` : 'ตั้งวันนัด PM1',
+        html: `<div class="sw-form"><b class="sw-name">${stWords(x.client)}</b><span class="sw-muted">${KIND_LABEL[x.kind]} · S/N ${escapeHtml(sn)}${st ? ' · เดิม ' + stDate(st.planned) : ''}</span>
+            <input type="date" id="swPmDate" class="swal2-input" value="${iso(cur)}">
+            <div class="rn-tl" id="swPmPrev">${prev(iso(cur))}</div>
+            <div class="ss-warn"><i class="fas fa-circle-info"></i> รอบถัดไปที่ยังไม่ปิดงาน เลื่อนตามทุก 4 เดือน · บันทึกในประวัติการแก้ไข</div></div>`,
+        showCancelButton: true, confirmButtonColor: '#22392b', confirmButtonText: 'บันทึกวันนัด', cancelButtonText: 'ยกเลิก',
+        didOpen: () => { const el = document.getElementById('swPmDate'); el.addEventListener('input', () => { document.getElementById('swPmPrev').innerHTML = prev(el.value); }); },
+        preConfirm: () => { const v = document.getElementById('swPmDate').value; if (!v) { Swal.showValidationMessage('กรุณาเลือกวันที่'); return false; } return v; }
+    });
+    if (!r.isConfirmed) return;
+    const [y, mo, d] = r.value.split('-');
+    Swal.fire({ title: 'กำลังบันทึก...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    try {
+        const res = await stApi({ action: 'set_pm_date', sn, pmStep: 'PM' + idx, date: `${+d}/${+mo}/${y}` });
+        if (res.status !== 'success') throw new Error(res.message || 'บันทึกไม่สำเร็จ');
+        Swal.close();
+        stDropCaches(sn);
+        Toast.fire({ icon: 'success', title: res.message || 'แก้วันนัดแล้ว' });
+        if (stShowNoPlan) stShowNoPlan = false;
+        loadData(true);
+    } catch (e) { Swal.fire('ไม่สำเร็จ', e.message, 'error'); }
+}
 function stFindMachine(sn) { return stMachines.find(m2 => m2.sn === sn) || appData.map(stCompute).filter(Boolean).find(m2 => m2.sn === sn); }
 
 /* ---------- กล้องถ่ายรูป (เต็มจอ) ---------- */
@@ -2427,22 +2526,28 @@ async function handleCheck(box, sn, stepKey) { if (box) box.checked = false; stO
 
 /* ---------- อะไหล่: เลือกหลายรายการ + ตะกร้า ---------- */
 let stPartNames = null;
-async function stLoadPartNames() {
-    if (stPartNames) return stPartNames;
-    try { const j = await stApi({ action: 'get_part_names' }); stPartNames = j.status === 'success' ? (j.names || []) : []; } catch (e) { stPartNames = []; }
-    return stPartNames;
+const stPartNamesBy = { panolyzer: null, sorter: null }; // v6 อะไหล่ที่ใช้บ่อยแยกตามประเภทเครื่อง
+async function stLoadPartNames(kind) {
+    kind = kind === 'sorter' ? 'sorter' : 'panolyzer';
+    if (stPartNamesBy[kind]) return (stPartNames = stPartNamesBy[kind]);
+    let list = [];
+    try { const j = await stApi({ action: 'get_part_names', kind }); list = j.status === 'success' ? (j.names || []) : []; } catch (e) { list = []; }
+    stPartNamesBy[kind] = list;
+    return (stPartNames = list);
 }
 function stPartsPicker(sn, key, after) {
     if (!stGuard()) return;
     const x = stFindMachine(sn);
+    const pkind = x && x.kind === 'sorter' ? 'sorter' : 'panolyzer';
+    stPartNames = stPartNamesBy[pkind];
     const basket = new Map(); // name → { qty, note, noteOpen }
     let q = '', saving = false;
     const sh = stSheet('', { wide: true });
     const all = () => {
         const freq = (stPartNames || []);
         const set = new Map();
-        COMMON_PARTS.forEach(n => set.set(n, 0));
-        freq.forEach(f => set.set(f.name, f.count));
+        (pkind === 'sorter' ? SORTER_PARTS : COMMON_PARTS).forEach(n => set.set(n, 0));
+        freq.forEach(f => set.set(f.name, f.count)); // หลังบ้านนับเฉพาะอะไหล่ของเครื่องประเภทเดียวกันแล้ว
         return [...set.entries()].map(([name, count]) => ({ name, count }));
     };
     function chip(n) {
@@ -2528,7 +2633,7 @@ function stPartsPicker(sn, key, after) {
         }
     }
     paint();
-    if (!stPartNames) stLoadPartNames().then(() => { if (!sh.closed) paint(); });
+    if (!stPartNames) stLoadPartNames(pkind).then(() => { if (!sh.closed) paint(); });
     setTimeout(() => { const qi = sh.el.querySelector('#ppQ'); if (qi && window.innerWidth >= 900) qi.focus(); }, 80);
 }
 function openAddPartForm(sn, stepKey) { stPartsPicker(sn, stepKey); }
