@@ -771,7 +771,7 @@ async function printServiceSlip(sn, idx) {
             <div class="sl-sec"><b>อะไหล่ที่เปลี่ยน</b><span>${partsTxt}</span></div>
             ${nextPlan ? `<div class="sl-sec"><b>นัดครั้งถัดไป</b><span>PM รอบที่ ${idx + 1} · ประมาณ ${stDate(nextPlan)}</span></div>` : '<div class="sl-sec"><b>สถานะสัญญา</b><span>ครบ 3 รอบของสัญญานี้แล้ว</span></div>'}
         </div>
-        <div class="sl-f">สอบถาม 063-929-1999 · www.c2tech.app</div></div>`;
+        <div class="sl-f">สอบถาม 061-552-9122 (Admin)</div></div>`;
     document.body.appendChild(card);
 
     // ถ้ารูปทำให้ส่งออกไม่ได้ (เช่น ติดสิทธิ์ข้ามโดเมน) สร้างใหม่โดยตัดรูปออก
